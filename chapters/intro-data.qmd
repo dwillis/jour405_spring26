@@ -1,165 +1,346 @@
 # Getting Started with Data
 
-Before we dive into statistical analysis, we need to understand the basics of working with data in R. This chapter will introduce you to the fundamental concepts and tools you'll use throughout this book.
+Your editor has a breaking news tip: a source at city hall says the mayor's office is hiding data about police overtime costs. You make some calls, file a records request, and three days later, an email arrives with an attachment: `police_overtime_2015_2024.csv`.
 
-## Setting Up Your Environment
+You open it in Excel. Hundreds of rows. Dozens of columns. Numbers and dates and department codes. Some columns have missing values. Some have weird formatting. The column names have spaces and special characters. It's a mess.
 
-Every R analysis begins by loading the necessary libraries. For most of our work, we'll use the tidyverse, a collection of R packages designed for data science.
+This is real data journalism. Not clean academic datasets, but messy government spreadsheets that someone  created in between phone calls and lunch breaks. Your job: make sense of it, find the story, and do it accurately before the competition does.
+
+This is where R comes in.
+
+## Why R for Journalism?
+
+You could do this in Excel. Many journalists do. But Excel has limits:
+
+- It's hard to document your steps (did you manually delete rows? Which ones?)
+- It's easy to make mistakes (one wrong click can corrupt data)
+- It doesn't scale (try opening a CSV with 500,000 rows in Excel)
+- It's not reproducible (try explaining your analysis to an editor)
+
+R solves these problems. Every step is code. Code can be saved, shared, reviewed, and re-run. You can document your thinking. You can catch mistakes. And when the city sends you updated data next week, you just re-run your code instead of redoing hours of Excel work.
+
+Plus, R is free. And it's what the smartest data journalists use.
+
+## Loading Your First Tool: The Tidyverse
+
+R comes with basic functionality, but for real work you need additional packages. The most important is the `tidyverse`, a collection of tools designed specifically for data analysis:
 
 ```{r setup, message=FALSE}
 library(tidyverse)
 ```
 
-The tidyverse includes several essential packages:
+That one line loads eight different packages:
 
-- **dplyr**: For data manipulation
-- **ggplot2**: For creating visualizations
-- **readr**: For reading data files
-- **tidyr**: For reshaping data
-- **tibble**: For modern data frames
+- **readr**: Reads CSV files and other data formats
+- **dplyr**: Manipulates data (filter, select, group, summarize)
+- **ggplot2**: Creates visualizations
+- **tidyr**: Reshapes data from wide to long format and vice versa
+- **tibble**: A modern take on data frames
+- **stringr**: Works with text
+- **forcats**: Handles categorical data
+- **purrr**: Functional programming tools
 
-## Loading Data
+Think of the tidyverse as your data journalism Swiss Army knife. You'll use it every day.
 
-Most journalism data comes from external sources like CSV files, APIs, or databases. The most common format you'll encounter is CSV (comma-separated values).
+## Getting Data Into R
+
+Data comes in many formats. CSV (comma-separated values) is the most common in journalism because it's simple and universal. Government agencies love CSV files.
+
+Here's how to load one:
 
 ```{r, eval=FALSE}
-# Load data from a CSV file
+# Load from your computer
 data <- read_csv("path/to/your/file.csv")
 
-# Load data from a URL
-data <- read_csv("https://example.com/data.csv")
+# Load from the internet (common in 2025)
+data <- read_csv("https://example.com/data/file.csv")
 ```
 
-When you load data, R creates a data frame (or tibble) - think of it as a spreadsheet with rows and columns.
+R stores this in a **data frame** (or technically, a **tibble**, which is an upgraded data frame). Think of it like a spreadsheet: rows are observations, columns are variables.
 
-## Understanding Your Data
+## Looking at Your Data (Always Do This First!)
 
-Before analyzing any dataset, you should always explore it first. Here are the essential commands:
+Never, ever start analyzing data before looking at it. You need to understand:
+- What's in each column?
+- How many rows?
+- Any missing values?
+- Do the numbers look reasonable?
+
+Here are the commands you'll use every single time:
 
 ```{r, eval=FALSE}
-# View the first few rows
+# See the first six rows
 head(data)
 
-# Get a summary of the structure
+# See the last six rows
+tail(data)
+
+# Get a quick summary of structure
 glimpse(data)
 
-# Get summary statistics
+# See summary statistics for each column
 summary(data)
 
-# Count the number of rows
+# How many rows?
 nrow(data)
 
-# See the column names
+# How many columns?
+ncol(data)
+
+# What are the column names?
 names(data)
 ```
 
-## Basic Data Manipulation
+Get in the habit of running these commands immediately after loading data. They'll save you hours of confusion later.
 
-The tidyverse uses a "pipe" operator (`|>` or `%>%`) that lets you chain operations together. Think of it as saying "and then..."
+## The Pipe: Your New Best Friend
+
+The tidyverse uses an operator that will seem weird at first but will quickly become natural: the pipe. It looks like `|>` (or `%>%` in older code - they work the same).
+
+The pipe means "take the output of this thing and pass it to the next thing." It lets you chain operations together in a way that reads like English:
 
 ```{r, eval=FALSE}
 data |>
-  filter(year == 2023) |>     # Keep only 2023 data
-  select(county, population) |> # Select specific columns
-  arrange(desc(population))    # Sort by population, descending
+  filter(year == 2024) |>      # Start with data, keep only 2024
+  select(department, overtime) |>  # Then select these columns
+  arrange(desc(overtime))      # Then sort by overtime, high to low
 ```
 
-### Common Operations
+Read that as: "Take the data, AND THEN filter for 2024, AND THEN select department and overtime columns, AND THEN sort by overtime descending."
 
-**Filtering rows:**
+This is much clearer than the old way of nesting functions inside each other. The pipe lets you build complex analysis step by step.
+
+## The Five Essential Operations
+
+Almost everything in data journalism involves five operations. Master these and you can do 90% of data analysis:
+
+### 1. Filter: Keep Rows That Match Conditions
+
 ```{r, eval=FALSE}
-# Keep only rows where population > 100000
-data |> filter(population > 100000)
+# Keep only rows where overtime is over $50,000
+data |> filter(overtime > 50000)
+
+# Keep only police department
+data |> filter(department == "Police")
+
+# Keep rows meeting multiple conditions
+data |> filter(year == 2024 & overtime > 50000)
 ```
 
-**Selecting columns:**
+### 2. Select: Pick Which Columns to Keep
+
 ```{r, eval=FALSE}
-# Keep only specific columns
-data |> select(county, crime_total, population)
+# Keep only these columns
+data |> select(officer_name, department, overtime)
+
+# Drop specific columns
+data |> select(-badge_number, -home_address)
+
+# Select columns by pattern
+data |> select(starts_with("overtime"))
 ```
 
-**Creating new columns:**
-```{r, eval=FALSE}
-# Add a new calculated column
-data |> mutate(crime_rate = crime_total / population * 100000)
-```
+### 3. Mutate: Create New Columns
 
-**Grouping and summarizing:**
 ```{r, eval=FALSE}
-# Calculate statistics by group
+# Create a new column
+data |> mutate(overtime_per_hour = overtime / hours_worked)
+
+# Create multiple columns
 data |>
-  group_by(year) |>
-  summarize(avg_crime = mean(crime_total))
+  mutate(
+    total_pay = base_salary + overtime,
+    overtime_percent = (overtime / base_salary) * 100
+  )
 ```
 
-## Dealing with Messy Column Names
+### 4. Arrange: Sort Rows
 
-Real-world data often has column names with spaces or special characters. The janitor package helps clean these up:
+```{r, eval=FALSE}
+# Sort by overtime, low to high
+data |> arrange(overtime)
+
+# Sort by overtime, high to low
+data |> arrange(desc(overtime))
+
+# Sort by multiple columns
+data |> arrange(department, desc(overtime))
+```
+
+### 5. Summarize: Calculate Statistics
+
+```{r, eval=FALSE}
+# Calculate summary statistics
+data |>
+  summarize(
+    total_overtime = sum(overtime),
+    avg_overtime = mean(overtime),
+    max_overtime = max(overtime),
+    count = n()  # n() counts rows
+  )
+```
+
+But `summarize()` really shines when you combine it with `group_by()`:
+
+```{r, eval=FALSE}
+# Calculate overtime by department
+data |>
+  group_by(department) |>
+  summarize(
+    total_overtime = sum(overtime),
+    avg_overtime = mean(overtime),
+    officer_count = n()
+  )
+```
+
+This is journalism gold. "Which department spent the most on overtime?" Answer: one line of code.
+
+## Dealing with Real-World Messiness
+
+Government data is messy. Column names have spaces. Values are inconsistent. You need tools to clean this up.
+
+Enter the `janitor` package:
 
 ```{r, eval=FALSE}
 library(janitor)
 
-# Clean column names (lowercase, replace spaces with underscores)
+# Clean column names automatically
 data <- data |> clean_names()
 ```
 
-After using `clean_names()`, a column called "Total Crime" becomes "total_crime", which is much easier to work with in R.
+This converts "Officer Name" to "officer_name", "Overtime $$" to "overtime", and "Dept." to "dept". One function, instantly cleaner data.
 
-## The Importance of Rates
+## The Critical Concept: Rates, Not Counts
 
-One of the most common mistakes in data journalism is comparing raw numbers when you should be comparing rates.
+Let's say you're comparing crime across cities. City A has 1,000 crimes. City B has 500 crimes. City A is more dangerous, right?
 
-**Example:** City A has 1,000 crimes and City B has 500 crimes. Which city is more dangerous?
+Wrong. Maybe.
 
-**Answer:** You can't tell without knowing the populations!
-
-If City A has 1 million people and City B has 10,000 people:
-- City A crime rate: (1,000 / 1,000,000) × 100,000 = 100 per 100,000 people
-- City B crime rate: (500 / 10,000) × 100,000 = 5,000 per 100,000 people
-
-City B is actually much more dangerous on a per-capita basis.
-
-### Calculating Rates
-
-The standard formula for a rate is:
+City A might have 1 million people. City B might have 10,000 people. To make fair comparisons, you need **rates** - counts divided by population:
 
 ```
 rate = (count / population) × standard_unit
 ```
 
-Common standard units:
-- Per 100,000 for crime rates
-- Per 1,000 for birth/death rates
-- Per 10,000 for some disease rates
+That standard unit is usually:
+- 100,000 for crime rates ("per 100,000 people")
+- 1,000 for birth/death rates
+- 10,000 for some health data
+
+Here's how you calculate it:
 
 ```{r, eval=FALSE}
 data |>
   mutate(crime_rate = (total_crimes / population) * 100000)
 ```
 
-## Best Practices
+Now City A's rate is 100 per 100,000 people (1,000 / 1,000,000 × 100,000). City B's rate is 5,000 per 100,000 people (500 / 10,000 × 100,000). City B is actually **50 times more dangerous**.
 
-As you work with data, keep these principles in mind:
+This mistake happens in news stories every day. Don't be that journalist.
 
-1. **Always check your data first**: Use `head()`, `glimpse()`, and `summary()` before analyzing
-2. **Document your work**: Add comments to explain what your code does
-3. **Keep raw data raw**: Never overwrite your original data file
-4. **Calculate rates, not just counts**: Almost always more meaningful for comparisons
-5. **Check for missing values**: Use `is.na()` to find them
-6. **Verify your results**: Do spot checks to make sure calculations make sense
+## A Simple Complete Example
 
-## Common Pitfalls
+Let's put it all together. You have police overtime data and you want to know: Which departments have the highest average overtime costs?
 
-Watch out for these frequent mistakes:
+```{r, eval=FALSE}
+overtime_data <- read_csv("police_overtime.csv") |>
+  clean_names() |>
+  filter(!is.na(overtime)) |>  # Remove rows with missing overtime values
+  group_by(department) |>
+  summarize(
+    total_officers = n(),
+    avg_overtime = mean(overtime),
+    total_overtime = sum(overtime)
+  ) |>
+  arrange(desc(avg_overtime))
 
-- **Comparing raw numbers instead of rates** when populations differ
-- **Forgetting to filter out missing values** before calculations
-- **Not checking data types** (numbers stored as text won't calculate correctly)
-- **Assuming data is clean** without inspecting it first
-- **Overwriting original data** instead of creating new columns
+# Look at the results
+head(overtime_data, 10)
+```
 
-## What's Next
+Six lines of code. You've loaded the data, cleaned the names, removed bad values, grouped by department, calculated statistics, and sorted the results.
 
-Now that you understand the basics of working with data in R, we're ready to apply these skills to real journalism scenarios. In the next chapter, we'll work with crime data to learn how to calculate meaningful rates and draw journalistic insights from data.
+That's the story. "Police officers in the Narcotics Division averaged $45,000 in overtime last year, more than any other department, according to records obtained by The Daily Times."
 
-Remember: the goal isn't just to run code, but to develop the analytical thinking that helps you find and tell important stories in data.
+## Document Everything
+
+Add comments to your code. Your future self (and your editor) will thank you:
+
+```{r, eval=FALSE}
+# Load 2024 police overtime data
+overtime_data <- read_csv("police_overtime_2024.csv") |>
+  clean_names() |>
+
+  # Remove rows where overtime is missing or negative (data errors)
+  filter(!is.na(overtime) & overtime >= 0) |>
+
+  # Keep only sworn officers (exclude civilians)
+  filter(employee_type == "Sworn") |>
+
+  # Calculate average overtime by department
+  group_by(department) |>
+  summarize(
+    officers = n(),
+    avg_overtime = mean(overtime),
+    total_overtime = sum(overtime)
+  ) |>
+
+  # Sort by highest average first
+  arrange(desc(avg_overtime))
+```
+
+Comments start with `#`. Use them liberally. Explain why you're doing something, not just what you're doing.
+
+## Common Beginner Mistakes
+
+Everyone makes these mistakes. Learn from them now:
+
+**Comparing raw counts instead of rates**: "City A has more crime than City B" → Wrong if populations differ
+
+**Not checking for missing values**: R will often silently ignore NA values, giving you wrong results
+
+**Forgetting to use assignment**: `data |> filter(year == 2024)` doesn't save the result. You need: `data <- data |> filter(year == 2024)`
+
+**Overwriting original data**: Save filtered/modified data with a new name: `data_2024 <- data |> filter(year == 2024)`
+
+**Assuming data is correct**: Always sanity-check your results. If the average overtime is $5 million, something's wrong.
+
+## What You've Learned
+
+You now know:
+- How to load data into R
+- The five essential data operations (filter, select, mutate, arrange, summarize)
+- How to use the pipe to chain operations
+- Why rates matter more than raw counts
+- How to clean messy column names
+- How to document your work with comments
+
+This is your foundation. Every analysis in this book builds on these basics.
+
+## Try It Yourself
+
+The best way to learn is by doing. Here's a challenge:
+
+1. Find a CSV file - any CSV file. Government data, sports statistics, whatever interests you.
+2. Load it into R
+3. Use `glimpse()` to explore it
+4. Use `select()` to keep only three interesting columns
+5. Use `filter()` to keep only rows that meet some condition
+6. Use `arrange()` to sort by one column
+7. Add comments explaining what you did
+
+Do this a few times and the commands will become second nature.
+
+## Looking Ahead
+
+You have the basics. Now we'll apply them to real journalism problems:
+
+- Calculating crime rates (Chapter 3)
+- Understanding samples and populations (Chapter 4)
+- Finding outliers with z-scores (Chapter 5)
+- Measuring relationships with correlation (Chapter 6)
+- Building regression models (Chapter 7)
+
+Each chapter will build on what you've learned here. The code will get more sophisticated, but the fundamentals stay the same: load data, look at it, manipulate it, analyze it, find the story.
+
+Welcome to data journalism. Let's get to work.
