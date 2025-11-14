@@ -1,0 +1,347 @@
+# Statistical Significance and T-Tests
+
+"The new training program improved performance by 15%!" Sounds impressive - but is it real, or could it just be random variation? Statistical significance testing helps answer this crucial question.
+
+## The Core Question
+
+Every statistical test asks: **"Could this difference have happened by chance?"**
+
+If yes → Not statistically significant (could be random noise)
+If no → Statistically significant (probably a real effect)
+
+## Understanding P-Values
+
+The **p-value** is the probability that you'd see a difference this large (or larger) if there were actually no real effect.
+
+**Conventional threshold: p < 0.05**
+
+- **p < 0.05**: Statistically significant (less than 5% chance this is random)
+- **p ≥ 0.05**: Not statistically significant (could easily be random)
+
+**But remember:**
+- p < 0.05 doesn't mean the effect is large or important
+- Statistical significance ≠ practical significance
+- p-values shouldn't be the only thing you report
+
+## Hypotheses
+
+Every significance test involves two hypotheses:
+
+**Null Hypothesis (H₀)**: There is no real difference
+- "The training program has no effect"
+- "The two groups have the same average height"
+
+**Alternative Hypothesis (H₁)**: There is a real difference
+- "The training program improves performance"
+- "The two groups have different average heights"
+
+The test helps us decide whether to reject the null hypothesis.
+
+## T-Tests: Comparing Means
+
+A **t-test** compares the means of two groups to see if they're significantly different.
+
+Types of t-tests:
+- **One-sample**: Compare a group to a known value
+- **Two-sample**: Compare two independent groups
+- **Paired**: Compare the same group at two time points
+
+## Setting Up
+
+```{r setup, message=FALSE}
+library(tidyverse)
+library(lubridate)
+library(janitor)
+```
+
+## Example: Are Maryland Basketball Players Shorter?
+
+Let's test whether University of Maryland women's basketball players are significantly shorter than Division I players overall.
+
+```{r load-basketball, message=FALSE}
+# Load all D-I women's basketball rosters
+wbb_rosters <- read_csv("https://raw.githubusercontent.com/Sports-Roster-Data/womens-college-basketball/main/wbb_rosters_2024_25.csv") |>
+  filter(!is.na(total_inches)) |>
+  filter(division == "I")
+
+# Get Maryland's roster
+maryland <- wbb_rosters |>
+  filter(ncaa_id == 392)
+
+# Get a random sample of 100 D-I players for comparison
+set.seed(42)
+population_sample <- wbb_rosters[sample(nrow(wbb_rosters), 100), ]
+
+glimpse(maryland)
+```
+
+## Defining Our Hypotheses
+
+**H₀**: Maryland players' average height = Division I average height
+
+**H₁**: Maryland players' average height ≠ Division I average height
+
+(This is a **two-tailed test** because we're checking for any difference, not specifically taller or shorter)
+
+## Comparing the Means
+
+```{r compare-means}
+# Maryland average
+maryland_mean <- mean(maryland$total_inches)
+
+# Sample average
+sample_mean <- mean(population_sample$total_inches)
+
+# Difference
+difference <- maryland_mean - sample_mean
+
+cat("Maryland average height:", round(maryland_mean, 2), "inches\n")
+cat("Sample average height:", round(sample_mean, 2), "inches\n")
+cat("Difference:", round(difference, 2), "inches\n")
+```
+
+But is this difference **statistically significant**?
+
+## Running the T-Test
+
+```{r t-test}
+# Perform t-test comparing Maryland to the sample mean
+result <- t.test(
+  x = maryland$total_inches,
+  mu = sample_mean,
+  alternative = "two.sided"
+)
+
+result
+```
+
+**Interpreting the results:**
+
+- **t-statistic**: How many standard errors the difference is
+- **p-value**: Probability this difference is due to chance
+- **95% confidence interval**: Range we're 95% confident contains the true mean
+- **sample estimates**: The mean we calculated
+
+```{r interpret}
+if (result$p.value < 0.05) {
+  cat("SIGNIFICANT: p =", round(result$p.value, 4), "\n")
+  cat("We reject the null hypothesis.\n")
+  cat("There IS a statistically significant difference in height.\n")
+} else {
+  cat("NOT SIGNIFICANT: p =", round(result$p.value, 4), "\n")
+  cat("We fail to reject the null hypothesis.\n")
+  cat("There is NO statistically significant difference in height.\n")
+}
+```
+
+## Visualizing the Comparison
+
+```{r height-viz, fig.width=10, fig.height=6}
+# Combine data for visualization
+comparison_data <- bind_rows(
+  maryland |> mutate(group = "Maryland"),
+  population_sample |> mutate(group = "D-I Sample")
+)
+
+ggplot(comparison_data, aes(x = group, y = total_inches, fill = group)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2, alpha = 0.3) +
+  theme_minimal() +
+  labs(
+    title = "Height Comparison: Maryland vs. Division I Sample",
+    subtitle = paste("p-value =", round(result$p.value, 4)),
+    x = NULL,
+    y = "Height (inches)",
+    fill = "Group"
+  ) +
+  scale_fill_manual(values = c("Maryland" = "#E03A3E", "D-I Sample" = "steelblue"))
+```
+
+## Another Example: Does a Training Program Work?
+
+Imagine you're reporting on an athlete who claims a new training program improved her 5K times.
+
+**Background:**
+- **Before**: Average time of 25.5 minutes (SD = 1.2 minutes)
+- **After**: 15 races with mean time of 24.8 minutes
+
+**Question**: Is this improvement statistically significant?
+
+```{r training-example}
+# Define the data
+sample_mean_after <- 24.8
+hypothesized_mean <- 25.5
+sample_std_dev <- 1.2
+sample_size <- 15
+
+# Calculate t-statistic manually
+t_statistic <- (sample_mean_after - hypothesized_mean) / (sample_std_dev / sqrt(sample_size))
+
+# Calculate degrees of freedom
+df <- sample_size - 1
+
+# Calculate p-value (one-tailed, testing if times got faster)
+p_value <- pt(t_statistic, df = df)
+
+cat("t-statistic:", round(t_statistic, 3), "\n")
+cat("p-value:", round(p_value, 4), "\n")
+
+if (p_value < 0.05) {
+  cat("\nSIGNIFICANT: The improvement is statistically significant.\n")
+} else {
+  cat("\nNOT SIGNIFICANT: The improvement could be due to chance.\n")
+}
+```
+
+## Understanding Type I and Type II Errors
+
+Statistical testing isn't perfect. Two types of errors can occur:
+
+**Type I Error (False Positive)**
+- Concluding there's a difference when there isn't
+- Probability = α (usually 0.05)
+- Example: "The drug works!" when it doesn't
+
+**Type II Error (False Negative)**
+- Concluding there's no difference when there is
+- Probability = β
+- Example: "The drug doesn't work" when it actually does
+
+The 0.05 threshold means we accept a 5% chance of Type I error.
+
+## Effect Size vs. Statistical Significance
+
+**Important distinction:**
+
+- **Statistical significance**: Is the difference likely real?
+- **Effect size**: How big is the difference?
+
+A tiny, meaningless difference can be statistically significant with a large sample.
+A large, important difference might not be statistically significant with a small sample.
+
+```{r effect-size-example, eval=FALSE}
+# Example: Large sample, tiny effect
+set.seed(42)
+group_a <- rnorm(10000, mean = 100, sd = 10)
+group_b <- rnorm(10000, mean = 100.5, sd = 10)  # Tiny 0.5 point difference
+
+t.test(group_a, group_b)  # Will likely be significant due to large n
+
+# But the actual difference is tiny and probably not meaningful!
+```
+
+## Confidence Intervals
+
+The 95% confidence interval tells you: "We're 95% confident the true value falls in this range."
+
+```{r confidence-interval}
+# Our earlier Maryland test
+result$conf.int
+```
+
+**Interpretation:**
+- If the interval includes the comparison value, the difference isn't significant
+- If it doesn't include the comparison value, the difference is significant
+- Wider intervals = more uncertainty
+
+## Practical vs. Statistical Significance
+
+Consider both:
+
+**Statistically significant but not meaningful:**
+"Treatment improved test scores by 0.3 points (p = 0.001)"
+- Technically significant, but who cares about 0.3 points?
+
+**Meaningful but not statistically significant:**
+"Crime decreased 25% (p = 0.08)"
+- Not technically significant, but 25% is notable! Maybe you need more data.
+
+## Reporting Significance in Journalism
+
+### Do:
+
+**Report the p-value:**
+"The difference was statistically significant (p = 0.003)"
+
+**Include effect size:**
+"Students in the program scored 12 points higher (p < 0.001)"
+
+**Provide context:**
+"While statistically significant, the 2-point difference is unlikely to affect college admissions"
+
+**Note sample size:**
+"Among 500 participants, the treatment group..."
+
+### Don't:
+
+**Don't say "proven":**
+~~"Study proves exercise prevents cancer"~~
+"Study finds significant association between exercise and lower cancer rates"
+
+**Don't overstate borderline results:**
+If p = 0.06, don't call it "significant"
+Say: "showed a trend toward significance" or "did not reach significance"
+
+**Don't ignore effect size:**
+Report both significance and magnitude
+
+**Don't use "significant" colloquially:**
+In statistics, "significant" has a specific meaning (p < 0.05)
+
+## Common Mistakes
+
+**1. P-hacking**
+- Running multiple tests until you find p < 0.05
+- Only reporting significant results
+- Solution: Pre-register hypotheses, report all tests
+
+**2. Ignoring assumptions**
+- T-tests assume normal distribution
+- Check this with larger samples or use alternative tests
+
+**3. Confusing correlation with causation**
+- Significance doesn't prove causation
+- Consider confounders and alternative explanations
+
+**4. Multiple comparisons**
+- Testing 20 hypotheses means 1 will be "significant" by chance
+- Adjust p-values when doing multiple tests
+
+## When to Use T-Tests
+
+**Good for:**
+- Comparing two groups
+- Normally distributed data (or large samples)
+- Simple comparisons
+
+**Not good for:**
+- More than two groups (use ANOVA instead - next chapter!)
+- Non-normal data with small samples (use non-parametric tests)
+- Complex relationships (use regression)
+
+## Key Takeaways
+
+- **P-values** tell you if a difference could be due to chance
+- **p < 0.05** is the conventional threshold for significance
+- **Significance ≠ importance**: Consider effect size too
+- **Always report**:
+  - Sample size
+  - P-value
+  - Effect size/difference
+  - Confidence interval
+- **Avoid causal language** unless you have experimental data
+- **Statistical significance** is necessary but not sufficient for a story
+
+## Try It Yourself
+
+1. If a study of 50 people finds p = 0.12, is the result statistically significant? What would you report?
+
+2. Two studies both find a 10-point difference:
+   - Study A: n=30, p=0.07
+   - Study B: n=300, p=0.001
+
+   Which is more convincing? Why?
+
+3. A politician claims their policy "significantly improved test scores by 1 point (p=0.04)." How would you report this fairly?
+
+Understanding statistical significance helps you evaluate research claims critically and report findings accurately. In the next chapter, we'll extend these concepts to comparing more than two groups using ANOVA.

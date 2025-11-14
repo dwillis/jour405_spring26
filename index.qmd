@@ -1,0 +1,59 @@
+# Welcome {.unnumbered}
+
+Statistics and data analysis are essential tools for modern journalism. From understanding crime trends to analyzing election results, from investigating educational disparities to exploring economic patterns, journalists need to be able to work with data confidently and accurately.
+
+This book is designed to help you develop those skills through practical, hands-on examples using real-world datasets. We'll use the R programming language and the tidyverse collection of packages to explore statistical concepts that every data journalist should know.
+
+## What You'll Learn
+
+Throughout this book, you'll develop skills in:
+
+- **Data manipulation and cleaning**: Working with messy real-world data and calculating meaningful rates and statistics
+- **Understanding distributions**: Identifying patterns, outliers, and unusual values in your data
+- **Finding relationships**: Discovering and measuring connections between variables
+- **Statistical testing**: Determining whether observed differences are meaningful or just random variation
+- **Advanced analysis**: Working with complex datasets including surveys and multiple regression models
+
+## How to Use This Book
+
+Each chapter introduces a statistical concept through practical journalism examples. You'll see:
+
+- Clear explanations of statistical concepts in plain language
+- Real datasets from journalism contexts
+- Working code examples in R that you can run and modify
+- Interpretation guidance to help you explain results to readers
+- Practical tips for using these methods in reporting
+
+## Prerequisites
+
+To get the most out of this book, you should have:
+
+- Basic familiarity with R and RStudio
+- The tidyverse package installed (`install.packages("tidyverse")`)
+- A willingness to experiment and learn by doing
+
+Don't worry if you're not a math expert. We'll focus on practical application rather than theoretical proofs, and we'll explain concepts in terms that make sense for journalism.
+
+## The Structure
+
+The book is organized into five parts:
+
+1. **Getting Started with Data**: Learn to load, clean, and calculate basic statistics
+2. **Understanding Distributions**: Master concepts like sampling, z-scores, and identifying outliers
+3. **Relationships Between Variables**: Explore correlation and regression analysis
+4. **Testing for Significance**: Understand when differences are statistically meaningful
+5. **Advanced Topics**: Tackle complex real-world challenges like survey weighting
+
+Each chapter builds on previous concepts, so we recommend working through them in order if you're new to statistical analysis.
+
+## A Note on Ethics
+
+As you develop these analytical skills, remember that with great power comes great responsibility. Statistical analysis can reveal important truths, but it can also mislead if used carelessly. Always:
+
+- Check your assumptions
+- Consider alternative explanations
+- Be transparent about your methods
+- Avoid cherry-picking results
+- Seek expert review when tackling complex topics
+
+Let's get started!

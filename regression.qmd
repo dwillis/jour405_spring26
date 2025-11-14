@@ -1,0 +1,323 @@
+# Linear Regression: Predicting and Explaining
+
+Correlation tells us two variables are related. Regression goes further: it quantifies the relationship and lets us make predictions. How much does test performance change for each percentage point increase in poverty? Can we predict a team's wins based on its statistics?
+
+## What Is Linear Regression?
+
+**Linear regression** creates a mathematical model of the relationship between:
+- **One dependent variable** (the outcome you want to predict or explain)
+- **One or more independent variables** (the predictors)
+
+The result is an equation of a line: **y = mx + b**
+
+Remember high school algebra? It's back, and it's useful.
+
+## When to Use Regression
+
+Use regression to:
+- **Predict outcomes**: What test score would we expect for a school with 60% poverty?
+- **Quantify relationships**: How much does each additional point of poverty reduce test scores?
+- **Control for confounders**: Does X affect Y after accounting for Z?
+- **Identify over/underperformers**: Which schools beat expectations?
+
+## Setting Up
+
+```{r setup, message=FALSE}
+library(tidyverse)
+```
+
+## Example: School Performance and Poverty
+
+Let's examine whether schools with higher poverty rates (measured by Free and Reduced-price Meals) have lower math test scores:
+
+```{r load-schools, message=FALSE}
+schools <- read_csv("https://raw.githubusercontent.com/dwillis/jour405_files/refs/heads/main/montgomery_pa.csv")
+
+glimpse(schools)
+```
+
+## Visualizing the Relationship
+
+Always start with a scatter plot:
+
+```{r scatter-schools, fig.width=10, fig.height=6}
+ggplot(schools, aes(x = `FARMS Pct`, y = `% Met or Exceeded Math Expectations`)) +
+  geom_point(alpha = 0.6, size = 3, color = "steelblue") +
+  geom_smooth(method = "lm", se = TRUE, color = "red") +
+  theme_minimal() +
+  labs(
+    title = "Poverty vs. Math Performance in Montgomery County Schools",
+    subtitle = "Each point represents one school",
+    x = "FARMS Percentage (Poverty Indicator)",
+    y = "% Meeting Math Expectations",
+    caption = "Red line shows linear regression fit"
+  )
+```
+
+The scatter plot shows a **negative relationship**: as poverty increases, math performance tends to decrease.
+
+## Building a Regression Model
+
+```{r model-schools}
+# Create the model
+model <- lm(`% Met or Exceeded Math Expectations` ~ `FARMS Pct`, data = schools)
+
+# View the results
+summary(model)
+```
+
+Let's break down this output:
+
+### The Coefficients
+
+```
+              Estimate Std. Error t value Pr(>|t|)
+(Intercept)   59.57897    x.xxxx   x.xxx  < 2e-16 ***
+FARMS Pct     -0.12349   x.xxxx   -x.xx   0.0xxx **
+```
+
+**The intercept** (59.58): The predicted math score for a school with 0% FARMS
+**The slope** (-0.12): For each 1-point increase in FARMS %, math scores decrease by 0.12 points
+
+**The equation:** Math Score = 59.58 - 0.12 × (FARMS %)
+
+### Model Quality
+
+**R-squared**: What percentage of variation in test scores is explained by poverty rates?
+- **0.65** = 65% explained (pretty good!)
+- **0.30** = 30% explained (moderate)
+- **0.10** = 10% explained (weak)
+
+**P-value**: Is this relationship statistically significant?
+- **< 0.05**: Yes, statistically significant
+- **≥ 0.05**: Could be due to chance
+
+**Residual Standard Error**: The typical prediction error (in the same units as the outcome)
+
+## Making Predictions
+
+Using our model equation:
+
+```{r predictions}
+# Predict math scores for schools with different FARMS percentages
+farms_examples <- c(10, 30, 50, 70)
+
+predictions <- tibble(
+  FARMS_Pct = farms_examples,
+  Predicted_Math_Score = 59.58 - 0.12 * farms_examples
+)
+
+knitr::kable(predictions, digits = 2)
+```
+
+## Calculating Residuals
+
+**Residuals** are the differences between actual and predicted values. They tell us:
+- Which schools outperform expectations (positive residual)
+- Which schools underperform (negative residual)
+- Whether our model fits the data well
+
+```{r residuals}
+# Add predictions and residuals to our data
+schools <- schools |>
+  mutate(
+    predicted = predict(model),
+    residual = `% Met or Exceeded Math Expectations` - predicted,
+    abs_residual = abs(residual)
+  )
+
+# Schools performing better than expected
+schools |>
+  arrange(desc(residual)) |>
+  select(School, `FARMS Pct`, `% Met or Exceeded Math Expectations`,
+         predicted, residual) |>
+  head(10) |>
+  knitr::kable(digits = 2)
+```
+
+```{r underperformers}
+# Schools performing worse than expected
+schools |>
+  arrange(residual) |>
+  select(School, `FARMS Pct`, `% Met or Exceeded Math Expectations`,
+         predicted, residual) |>
+  head(10) |>
+  knitr::kable(digits = 2)
+```
+
+These outliers are story leads! Why are some schools beating expectations? Why are others falling short?
+
+## Visualizing Residuals
+
+```{r residual-plot, fig.width=10, fig.height=6}
+ggplot(schools, aes(x = predicted, y = residual)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_point(alpha = 0.6, size = 3, color = "steelblue") +
+  theme_minimal() +
+  labs(
+    title = "Residual Plot: Checking Model Assumptions",
+    subtitle = "Points should be randomly scattered around zero",
+    x = "Predicted Math Score",
+    y = "Residual (Actual - Predicted)"
+  )
+```
+
+**What to look for:**
+- **Random scatter**: Good! Model assumptions are met
+- **Pattern or curve**: Bad! Relationship isn't linear
+- **Funnel shape**: Variance isn't constant (heteroscedasticity)
+
+## Another Example: Electric Vehicle Adoption
+
+Let's look at whether electric vehicle registrations predict hybrid vehicle registrations:
+
+```{r load-evs, message=FALSE}
+vehicle_data <- read_csv("https://raw.githubusercontent.com/dwillis/jour405_files/main/electric_hybrid_0424.csv")
+
+# Calculate per-capita rates
+vehicle_data <- vehicle_data |>
+  mutate(
+    Electric_per_1000 = (Electric / Population) * 1000,
+    Hybrid_per_1000 = (Hybrid / Population) * 1000
+  )
+
+glimpse(vehicle_data)
+```
+
+### Visualize the Relationship
+
+```{r ev-scatter, fig.width=10, fig.height=6}
+ggplot(vehicle_data, aes(x = Electric, y = Hybrid)) +
+  geom_point(alpha = 0.6, size = 3, color = "darkgreen") +
+  geom_smooth(method = "lm", se = TRUE, color = "blue") +
+  theme_minimal() +
+  labs(
+    title = "Electric vs. Hybrid Vehicle Registrations by County",
+    x = "Electric Vehicle Registrations",
+    y = "Hybrid Vehicle Registrations"
+  )
+```
+
+### Build the Model
+
+```{r ev-model}
+ev_model <- lm(Hybrid ~ Electric, data = vehicle_data)
+summary(ev_model)
+```
+
+**Interpretation:**
+- **Very high R-squared** (likely > 0.95): Electric vehicles strongly predict hybrid vehicles
+- **This makes sense**: Counties with EV infrastructure likely support all alternative vehicles
+- **But correlation isn't causation**: Both might be driven by environmental attitudes, wealth, etc.
+
+### Check the Residuals
+
+```{r ev-residuals}
+vehicle_data <- vehicle_data |>
+  mutate(
+    predicted_hybrid = predict(ev_model),
+    residual = Hybrid - predicted_hybrid
+  )
+
+# Counties with more hybrids than expected
+vehicle_data |>
+  arrange(desc(residual)) |>
+  select(County, Electric, Hybrid, predicted_hybrid, residual) |>
+  head(5) |>
+  knitr::kable(digits = 1)
+```
+
+These counties have more hybrids than you'd expect based on their EV numbers. Why? Maybe hybrids were popular there earlier, or there are different demographic patterns.
+
+## Regression in Journalism: Real Applications
+
+### Education Reporting
+
+"Schools with higher poverty rates score lower on tests" - everyone knows this. But regression lets you:
+
+- **Quantify the gap**: "Each 10-point increase in poverty predicts a 4.2-point drop in scores"
+- **Find exceptions**: "Despite 75% poverty, Lincoln Elementary beats expectations by 12 points"
+- **Hold schools accountable**: "With only 20% poverty, Washington High should score higher"
+
+### Political Coverage
+
+- Predict election outcomes based on demographics
+- Identify swing districts that deviate from models
+- Understand which factors drive voting patterns
+
+### Criminal Justice
+
+- Predict crime rates based on socioeconomic factors
+- Identify neighborhoods with unexpectedly high/low crime
+- Evaluate whether new policies change the relationship
+
+### Economic Reporting
+
+- Predict housing prices based on location and characteristics
+- Find over/undervalued properties
+- Track how relationships change over time
+
+## Best Practices for Journalism
+
+### Do:
+
+1. **Visualize first**: Always make a scatter plot
+2. **Check assumptions**: Look at residual plots
+3. **Report uncertainty**: Include R-squared and p-values
+4. **Explain in context**: Translate coefficients to meaningful units
+5. **Highlight outliers**: They're often the most interesting stories
+6. **Avoid causal language**: "Associated with" not "causes"
+
+### Don't:
+
+1. **Extrapolate wildly**: Don't predict beyond your data range
+2. **Ignore poor fit**: Low R-squared means weak predictions
+3. **Forget context**: Numbers need interpretation
+4. **Cherry-pick**: Report the full picture, not just dramatic outliers
+5. **Assume linearity**: Check if the relationship is actually straight
+
+## Common Pitfalls
+
+**Outliers have huge influence**
+- One extreme value can skew the entire line
+- Always check for and investigate outliers
+
+**Correlation ≠ Causation** (still!)
+- Regression quantifies relationships but doesn't prove causation
+- Consider confounders and alternative explanations
+
+**Extrapolation is dangerous**
+- Don't predict beyond the range of your data
+- Example: Don't use a model built on schools with 10-90% poverty to predict a school with 100% poverty
+
+**Non-linear relationships**
+- Not all relationships are straight lines
+- Check residual plots for patterns
+
+## Reporting Template
+
+Here's how to report regression findings:
+
+> "An analysis of Montgomery County schools shows a strong negative relationship between poverty rates and math test scores (R² = 0.65, p < 0.001). For each 10-point increase in the percentage of students receiving free or reduced-price meals, math proficiency scores decline by an average of 1.2 percentage points.
+>
+> However, several schools significantly outperform this trend. Lincoln Elementary, with 72% of students in poverty, has math scores 15 points higher than the model would predict - the largest positive deviation in the district. Principal Jane Smith attributes the success to..."
+
+## Key Takeaways
+
+- **Regression quantifies relationships** between variables
+- **The slope tells you** how much Y changes when X increases by 1
+- **R-squared shows** what percentage of variation is explained
+- **Residuals identify** outliers and over/underperformers
+- **Always visualize** to check assumptions
+- **Interpret carefully**: Association, not causation
+- **Outliers are stories**: Investigate what makes them different
+
+## Try It Yourself
+
+1. In the schools example, what math score would you predict for a school with 45% FARMS?
+
+2. Find the school with the largest negative residual. What might explain its underperformance?
+
+3. Try creating a regression model with a different independent variable. How does it compare?
+
+Regression is one of the most powerful tools in data journalism. It lets you move from "these things are related" to "here's exactly how much one thing predicts another" - and that precision often makes the difference between a vague story and a compelling one.

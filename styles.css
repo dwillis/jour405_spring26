@@ -1,0 +1,42 @@
+/* Custom CSS for the Statistics and Data Analysis for Journalists book */
+
+/* Make code blocks more readable */
+pre {
+  background-color: #f5f5f5;
+  border-left: 3px solid #2780e3;
+  padding: 10px;
+}
+
+/* Style inline code */
+code {
+  background-color: #f5f5f5;
+  padding: 2px 4px;
+  border-radius: 3px;
+}
+
+/* Enhance tables */
+table {
+  margin: 20px 0;
+}
+
+/* Style blockquotes for callouts */
+blockquote {
+  border-left: 4px solid #2780e3;
+  padding-left: 15px;
+  font-style: italic;
+  color: #666;
+}
+
+/* Improve heading spacing */
+h1, h2, h3 {
+  margin-top: 30px;
+  margin-bottom: 15px;
+}
+
+/* Style figure captions */
+figcaption {
+  font-style: italic;
+  color: #666;
+  text-align: center;
+  margin-top: 10px;
+}

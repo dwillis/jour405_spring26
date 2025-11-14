@@ -1,0 +1,61 @@
+project:
+  type: book
+  output-dir: docs
+
+book:
+  title: "Statistics and Data Analysis for Journalists"
+  subtitle: "A practical guide to statistical methods in journalism"
+  author: "JOUR 405"
+  date: today
+
+  chapters:
+    - index.qmd
+    - part: "Getting Started with Data"
+      chapters:
+        - intro-data.qmd
+        - crime-rates.qmd
+    - part: "Understanding Distributions"
+      chapters:
+        - sampling.qmd
+        - z-scores.qmd
+    - part: "Relationships Between Variables"
+      chapters:
+        - correlation.qmd
+        - regression.qmd
+        - multiple-regression.qmd
+    - part: "Testing for Significance"
+      chapters:
+        - significance.qmd
+        - anova.qmd
+    - part: "Advanced Topics"
+      chapters:
+        - weighting.qmd
+
+  navbar:
+    left:
+      - text: "Home"
+        href: index.qmd
+    right:
+      - icon: github
+        href: https://github.com/dwillis/jour405_spring25
+
+  page-footer:
+    left: "Statistics and Data Analysis for Journalists"
+    right: "Built with Quarto"
+
+bibliography: references.bib
+
+format:
+  html:
+    theme:
+      light: flatly
+      dark: darkly
+    css: styles.css
+    toc: true
+    toc-depth: 3
+    number-sections: true
+    code-fold: false
+    code-tools: true
+    code-copy: true
+    smooth-scroll: true
+    link-external-newwindow: true

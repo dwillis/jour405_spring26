@@ -1,0 +1,430 @@
+# Multiple Regression: Controlling for Multiple Factors
+
+Simple regression looks at one predictor. But real-world outcomes usually depend on multiple factors. Do football teams win because of yards gained, takeaways, or points scored - or all three? Multiple regression lets you examine several predictors simultaneously.
+
+## Why Multiple Regression?
+
+Real-world phenomena have multiple causes:
+
+- **School performance**: Poverty, class size, teacher experience, funding...
+- **Crime rates**: Poverty, unemployment, police presence, demographics...
+- **Election outcomes**: Demographics, economy, incumbency, turnout...
+- **Sports wins**: Offense, defense, special teams, coaching...
+
+**Multiple regression** lets you:
+- **Control for confounders**: Isolate the effect of each variable
+- **Quantify relative importance**: Which factors matter most?
+- **Make better predictions**: Use multiple predictors together
+- **Understand complex relationships**: See how factors interact
+
+## Simple vs. Multiple Regression
+
+**Simple regression:**
+```
+Wins = β₀ + β₁(Points Scored)
+```
+
+**Multiple regression:**
+```
+Wins = β₀ + β₁(Points Scored) + β₂(Yards Gained) + β₃(Takeaways)
+```
+
+Each coefficient (β) shows the effect of that variable **while holding all other variables constant**.
+
+## Setting Up
+
+```{r setup, message=FALSE}
+library(tidyverse)
+library(corrplot)
+```
+
+## Example: What Predicts NFL Wins?
+
+Let's analyze 2019 NFL team statistics to understand what drives winning:
+
+```{r load-data, message=FALSE}
+teams <- read_csv("https://raw.githubusercontent.com/dwillis/jour405_files/main/nfl_2019.csv")
+
+glimpse(teams)
+```
+
+## Exploring the Variables
+
+Before building a model, explore relationships:
+
+```{r summary}
+teams |>
+  select(Wins, `Points Scored`, `Yards Gained`, Takeaways) |>
+  summary()
+```
+
+## Correlation Matrix
+
+Check how variables relate to each other:
+
+```{r correlation}
+selected_vars <- teams |>
+  select(Wins, `Yards Gained`, Takeaways, `Points Scored`)
+
+cor_matrix <- cor(selected_vars)
+kable(cor_matrix, digits = 3)
+```
+
+### Visualize Correlations
+
+```{r corr-viz, fig.width=8, fig.height=8}
+corrplot(cor_matrix, method = "circle", type = "upper",
+         tl.col = "black", tl.srt = 45,
+         addCoef.col = "black", number.cex = 0.8)
+```
+
+**Observations:**
+- All three predictors correlate positively with wins
+- Points scored shows the strongest correlation
+- The predictors also correlate with each other (multicollinearity - more on this later)
+
+## Building the Multiple Regression Model
+
+```{r model}
+model <- lm(Wins ~ `Yards Gained` + Takeaways + `Points Scored`, data = teams)
+summary(model)
+```
+
+## Understanding the Output
+
+Let's break down each part:
+
+### Residuals
+
+```
+    Min      1Q  Median      3Q     Max
+-4.3780 -1.1639 -0.0604  1.4802  4.1361
+```
+
+- **Median near 0**: Good sign - model isn't systematically biased
+- **Range**: Most predictions are within ~4 wins of actual
+
+### Coefficients
+
+```
+                Estimate Std. Error t value Pr(>|t|)
+(Intercept)    -4.568173   5.234556  -0.873  0.38958
+Yards Gained   -0.001329   0.001375  -0.967  0.34332
+Takeaways       0.150593   0.082643   1.822  0.07928
+Points Scored   0.038732   0.013380   2.895  0.00665 **
+```
+
+**Interpreting coefficients:**
+
+**Points Scored (0.0387):**
+- For each additional point scored (holding yards and takeaways constant), wins increase by 0.0387
+- **p = 0.00665**: Statistically significant
+- **This matters most**: Only significant predictor
+
+**Takeaways (0.151):**
+- Each additional takeaway predicts 0.151 more wins
+- **p = 0.079**: Marginally significant (close to 0.05 threshold)
+- **Borderline importance**: Might matter
+
+**Yards Gained (-0.0013):**
+- Negative coefficient! Counterintuitive
+- **p = 0.34**: Not significant
+- **Doesn't matter** in this model (once we account for points and takeaways)
+
+### Model Fit
+
+```
+Multiple R-squared:  0.6232
+Adjusted R-squared:  0.5828
+F-statistic: 15.44 on 3 and 28 DF, p-value: 4.058e-06
+```
+
+**R-squared (0.6232):**
+- 62.3% of variation in wins is explained by these three variables
+- Pretty good! But 37.7% is still unexplained
+
+**Adjusted R-squared (0.5828):**
+- Accounts for number of predictors
+- Penalizes adding variables that don't help
+- Use this when comparing models with different numbers of predictors
+
+**F-statistic:**
+- Tests whether the model as a whole is significant
+- **p < 0.001**: Yes, the model is definitely better than nothing
+
+## The Surprising Yards Finding
+
+Why is yards gained not significant (and even negative)?
+
+**Explanation:** **Multicollinearity**
+
+Yards gained correlates with points scored. Once you account for points, yards adds little new information. The model is saying: "What matters is **scoring points**, not just gaining yards."
+
+This is actually an interesting journalistic insight!
+
+## Checking for Multicollinearity
+
+When predictors correlate strongly with each other, coefficients become unstable:
+
+```{r vif}
+# Variance Inflation Factor (VIF)
+# VIF > 10 indicates problematic multicollinearity
+car::vif(model)
+```
+
+**VIF interpretation:**
+- **VIF < 5**: No problem
+- **5 < VIF < 10**: Moderate multicollinearity
+- **VIF > 10**: Serious multicollinearity
+
+If VIF is high, consider:
+- Removing one of the correlated variables
+- Combining them into a single measure
+- Using a different modeling approach
+
+## Making Predictions
+
+Use the model equation to predict wins:
+
+```{r predictions}
+# Example: Predict wins for a hypothetical team
+hypothetical_team <- tibble(
+  `Yards Gained` = 5500,
+  Takeaways = 25,
+  `Points Scored` = 400
+)
+
+predicted_wins <- predict(model, newdata = hypothetical_team)
+cat("Predicted wins:", round(predicted_wins, 1))
+```
+
+## Identifying Over/Underperformers
+
+```{r residuals}
+teams <- teams |>
+  mutate(
+    predicted_wins = predict(model),
+    residual = Wins - predicted_wins
+  )
+
+# Teams that exceeded expectations
+teams |>
+  arrange(desc(residual)) |>
+  select(Team, Wins, predicted_wins, residual, `Points Scored`, Takeaways, `Yards Gained`) |>
+  head(5) |>
+  kable(digits = 2)
+```
+
+```{r underperformers}
+# Teams that fell short
+teams |>
+  arrange(residual) |>
+  select(Team, Wins, predicted_wins, residual, `Points Scored`, Takeaways, `Yards Gained`) |>
+  head(5) |>
+  kable(digits = 2)
+```
+
+These outliers are story leads: What explains the gap between expected and actual wins?
+
+## Visualizing Actual vs. Predicted
+
+```{r actual-vs-predicted, fig.width=10, fig.height=8}
+ggplot(teams, aes(x = predicted_wins, y = Wins)) +
+  geom_point(size = 3, color = "steelblue") +
+  geom_abline(intercept = 0, slope = 1, linetype = "dashed", color = "red") +
+  geom_text(aes(label = Team), size = 3, hjust = -0.1, vjust = -0.1, check_overlap = TRUE) +
+  theme_minimal() +
+  labs(
+    title = "Actual vs. Predicted Wins",
+    subtitle = "Points on red line = perfect prediction",
+    x = "Predicted Wins",
+    y = "Actual Wins"
+  )
+```
+
+## Checking Model Assumptions
+
+### Residual Plot
+
+```{r residual-plot, fig.width=10, fig.height=6}
+ggplot(teams, aes(x = predicted_wins, y = residual)) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  geom_point(size = 3, color = "steelblue") +
+  theme_minimal() +
+  labs(
+    title = "Residual Plot",
+    subtitle = "Should show random scatter around zero",
+    x = "Predicted Wins",
+    y = "Residual"
+  )
+```
+
+**Look for:**
+- **Random scatter**: Good! Assumptions met
+- **Curved pattern**: Relationship isn't linear
+- **Funnel shape**: Variance isn't constant
+
+### Normal Q-Q Plot
+
+```{r qq-plot, fig.width=10, fig.height=6}
+ggplot(teams, aes(sample = residual)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  theme_minimal() +
+  labs(
+    title = "Normal Q-Q Plot",
+    subtitle = "Points should follow the red line"
+  )
+```
+
+If points deviate from the line, residuals aren't normally distributed (might be problematic with small samples).
+
+## Comparing Models
+
+Should we include all three predictors, or drop some?
+
+```{r model-comparison}
+# Model with just points
+model_simple <- lm(Wins ~ `Points Scored`, data = teams)
+
+# Model with points and takeaways
+model_medium <- lm(Wins ~ `Points Scored` + Takeaways, data = teams)
+
+# Full model (already created)
+
+# Compare R-squared
+comparison <- tibble(
+  Model = c("Points Only", "Points + Takeaways", "All Three"),
+  Predictors = c(1, 2, 3),
+  R_Squared = c(
+    summary(model_simple)$r.squared,
+    summary(model_medium)$r.squared,
+    summary(model)$r.squared
+  ),
+  Adj_R_Squared = c(
+    summary(model_simple)$adj.r.squared,
+    summary(model_medium)$adj.r.squared,
+    summary(model)$adj.r.squared
+  )
+)
+
+kable(comparison, digits = 4)
+```
+
+**Observation:**
+- Adding takeaways improves fit slightly
+- Adding yards doesn't help (and isn't significant)
+- **Best model**: Probably Points + Takeaways
+
+## Journalistic Applications
+
+### Sports Coverage
+
+**Traditional story:**
+"Team X won 10 games this season"
+
+**Data-driven story:**
+"Team X won 10 games despite advanced analytics predicting only 7 wins based on their offensive and defensive statistics. Their 3-win overperformance suggests exceptional coaching or luck in close games..."
+
+### Education Reporting
+
+```{r education-example, eval=FALSE}
+# Multiple factors affecting test scores
+model <- lm(test_scores ~ poverty_rate + class_size + teacher_experience +
+            funding_per_student, data = schools)
+
+# Which factors matter most?
+# Which schools outperform predictions?
+```
+
+### Political Coverage
+
+```{r politics-example, eval=FALSE}
+# What predicts election outcomes?
+model <- lm(vote_share ~ unemployment + income + education +
+            previous_vote, data = counties)
+
+# Find counties that don't fit the pattern
+```
+
+## Reporting Multiple Regression
+
+### Example Article Excerpt
+
+> **Points Matter More Than Yards in NFL Success**
+>
+> An analysis of 2019 NFL statistics reveals that scoring points, not simply moving the ball, drives winning.
+>
+> A regression model examining yards gained, takeaways, and points scored found that only points scored significantly predicted wins (β = 0.039, p = 0.007). For every 10 additional points scored over the season, teams won approximately 0.4 more games.
+>
+> Surprisingly, yards gained showed no significant relationship with wins after accounting for points and takeaways. This suggests that efficient offense - converting yards into points - matters more than raw yardage.
+>
+> The model explained 62% of variation in team wins, with the New England Patriots significantly outperforming predictions...
+
+### What to Include
+
+**Do report:**
+- Which variables matter (significant coefficients)
+- Effect sizes in meaningful units
+- Model fit (R-squared)
+- Notable outliers
+- Limitations and caveats
+
+**Don't:**
+- Dump raw regression output in the article
+- Report non-significant predictors as if they matter
+- Claim causation without experimental design
+- Ignore multicollinearity issues
+
+## Common Pitfalls
+
+**1. Including irrelevant predictors**
+- More predictors ≠ better model
+- Use theory and significance tests to guide inclusion
+
+**2. Ignoring multicollinearity**
+- Highly correlated predictors make coefficients unstable
+- Check VIF values
+
+**3. Overfitting**
+- Too many predictors relative to sample size
+- Rule of thumb: At least 10-20 observations per predictor
+
+**4. Extrapolating beyond data**
+- Don't predict for values outside your data range
+
+**5. Assuming causation**
+- Regression shows association, not causation
+- Need experimental design or causal inference methods for causation
+
+## Stepwise Regression Warning
+
+You might encounter "stepwise regression" which automatically adds/removes predictors. **Be cautious:**
+
+- Can lead to overfitting
+- Capitalizes on random chance
+- Produces unstable models
+- Better to use theory to guide variable selection
+
+## Key Takeaways
+
+- **Multiple regression** examines several predictors simultaneously
+- **Coefficients** show effects while holding other variables constant
+- **R-squared** indicates percentage of variance explained
+- **Adjusted R-squared** accounts for number of predictors
+- **Multicollinearity** occurs when predictors correlate with each other
+- **Check assumptions**: Linearity, normality, constant variance
+- **Report responsibly**: Include effect sizes, significance, and limitations
+- **Outliers tell stories**: Investigate over/underperformers
+
+## Try It Yourself
+
+1. In our model, what would you predict for a team with 350 points, 5,800 yards, and 20 takeaways?
+
+2. Why might yards gained have a negative coefficient? What does this tell us about the relationship between yards and wins?
+
+3. Build a simpler model with just Points Scored and Takeaways. How does it compare to the full model?
+
+4. Find the team with the largest positive residual. What might explain their overperformance?
+
+Multiple regression is one of the most powerful and widely-used tools in data journalism. It lets you move beyond simple correlations to understand how multiple factors work together to influence outcomes. Master this technique, and you'll be able to tackle complex analytical stories with confidence.

@@ -1,0 +1,279 @@
+# Sampling and Populations
+
+When you can't survey every single person in a group, you take a sample. But how do you know if your sample accurately represents the whole population? And how large does a sample need to be? These are crucial questions for journalists who work with polls, surveys, and sampled data.
+
+## Why Sampling Matters in Journalism
+
+Journalists regularly encounter sampled data:
+
+- Election polls that survey 1,000 voters instead of millions
+- Health studies that examine hundreds of patients instead of entire populations
+- Restaurant inspections that check a sample of establishments
+- Quality control tests on products
+
+Understanding sampling helps you:
+- Evaluate whether a poll or study is trustworthy
+- Know when a sample size is too small to be meaningful
+- Understand margins of error
+- Avoid being misled by cherry-picked examples
+
+## Populations vs. Samples
+
+**Population**: The entire group you want to understand
+- All registered voters in a state
+- Every student in a school district
+- All crimes committed in a year
+
+**Sample**: A subset of the population that you actually measure
+- 800 voters who answered a poll
+- 200 students who took a survey
+- Crimes that were reported to police
+
+The goal of sampling is to learn about the population by studying the sample.
+
+## Setting Up
+
+```{r setup, message=FALSE}
+library(tidyverse)
+```
+
+## Creating a Population
+
+For this exercise, we'll create a simulated population of ages for people aged 18-80. In real journalism, you'd rarely create fake data like this, but it helps us understand how sampling works.
+
+```{r create-population}
+# Set seed for reproducibility
+set.seed(42)
+
+# Create a population of 1,000 people with random ages
+population <- tibble(
+  id = 1:1000,
+  age = sample(18:80, 1000, replace = TRUE)
+)
+
+# Look at the population
+head(population)
+
+# Population statistics
+population_mean <- mean(population$age)
+population_sd <- sd(population$age)
+
+cat("Population mean age:", round(population_mean, 2), "\n")
+cat("Population SD:", round(population_sd, 2), "\n")
+```
+
+## Taking a Random Sample
+
+Now let's take a sample of 100 people from our population:
+
+```{r sample-data}
+# Take a random sample of 100
+sample_data <- population |>
+  slice_sample(n = 100)
+
+# Sample statistics
+sample_mean <- mean(sample_data$age)
+sample_sd <- sd(sample_data$age)
+
+cat("Sample mean age:", round(sample_mean, 2), "\n")
+cat("Sample SD:", round(sample_sd, 2), "\n")
+```
+
+## Comparing Sample to Population
+
+How close did our sample get to the true population values?
+
+```{r comparison}
+# Create comparison table
+comparison <- tibble(
+  Statistic = c("Mean Age", "Standard Deviation"),
+  Population = c(population_mean, population_sd),
+  Sample = c(sample_mean, sample_sd),
+  Difference = c(
+    sample_mean - population_mean,
+    sample_sd - population_sd
+  )
+)
+
+comparison
+```
+
+The sample probably came pretty close to the population values, but not exactly. That's normal! Every sample will be slightly different.
+
+## The Magic of Random Sampling
+
+Let's see what happens if we take multiple samples:
+
+```{r multiple-samples}
+# Take 50 different samples of size 100
+multiple_samples <- map_df(1:50, function(i) {
+  population |>
+    slice_sample(n = 100) |>
+    summarize(
+      sample_id = i,
+      mean_age = mean(age)
+    )
+})
+
+# Look at the distribution of sample means
+ggplot(multiple_samples, aes(x = mean_age)) +
+  geom_histogram(bins = 20, fill = "steelblue", color = "white") +
+  geom_vline(xintercept = population_mean, color = "red", linetype = "dashed", size = 1) +
+  theme_minimal() +
+  labs(
+    title = "Distribution of Sample Means",
+    subtitle = paste("Red line shows true population mean:", round(population_mean, 2)),
+    x = "Sample Mean Age",
+    y = "Count"
+  )
+```
+
+Notice how the sample means cluster around the true population mean (red line). This is the **Central Limit Theorem** in action: sample means tend to form a normal distribution centered on the population mean.
+
+## Sample Size Matters
+
+What happens if we use smaller samples?
+
+```{r sample-size-comparison}
+# Compare different sample sizes
+sample_sizes <- c(10, 25, 50, 100, 200)
+
+results <- map_df(sample_sizes, function(n) {
+  # Take 50 samples of size n
+  map_df(1:50, function(i) {
+    population |>
+      slice_sample(n = n) |>
+      summarize(
+        sample_size = n,
+        sample_id = i,
+        mean_age = mean(age)
+      )
+  })
+})
+
+# Visualize
+ggplot(results, aes(x = factor(sample_size), y = mean_age)) +
+  geom_boxplot(fill = "steelblue") +
+  geom_hline(yintercept = population_mean, color = "red", linetype = "dashed") +
+  theme_minimal() +
+  labs(
+    title = "How Sample Size Affects Accuracy",
+    subtitle = "Larger samples produce more consistent estimates",
+    x = "Sample Size",
+    y = "Sample Mean Age"
+  )
+```
+
+**Key insight**: Larger samples produce estimates that cluster more tightly around the true population value. Smaller samples are more variable.
+
+## The Standard Error
+
+The **standard error** tells us how much we expect sample means to vary. It's calculated as:
+
+```
+SE = population_SD / sqrt(sample_size)
+```
+
+```{r standard-error}
+# Calculate standard errors for different sample sizes
+se_comparison <- tibble(
+  sample_size = c(10, 25, 50, 100, 200, 500, 1000),
+  standard_error = population_sd / sqrt(sample_size)
+)
+
+ggplot(se_comparison, aes(x = sample_size, y = standard_error)) +
+  geom_line(color = "steelblue", size = 1.2) +
+  geom_point(size = 3, color = "steelblue") +
+  theme_minimal() +
+  labs(
+    title = "Standard Error Decreases as Sample Size Increases",
+    subtitle = "But notice the curve flattens - diminishing returns from larger samples",
+    x = "Sample Size",
+    y = "Standard Error"
+  )
+```
+
+Notice how the standard error drops quickly at first, but then the improvements get smaller. This is why polls rarely survey more than 1,000-1,500 people - you get diminishing returns after that.
+
+## Margin of Error
+
+In journalism, you often see a **margin of error** reported with polls. For a 95% confidence level, the margin of error is approximately:
+
+```
+Margin of Error ≈ 2 × SE = 2 × (SD / sqrt(n))
+```
+
+This means we can be 95% confident the true population value falls within our sample estimate ± the margin of error.
+
+```{r margin-of-error}
+# For a sample of 100
+sample_size <- 100
+se <- population_sd / sqrt(sample_size)
+moe <- 2 * se
+
+cat("For a sample of", sample_size, ":\n")
+cat("Standard Error:", round(se, 2), "\n")
+cat("Margin of Error (95% confidence):", round(moe, 2), "\n")
+cat("\nIf our sample mean is", round(sample_mean, 2), "\n")
+cat("We're 95% confident the population mean is between",
+    round(sample_mean - moe, 2), "and", round(sample_mean + moe, 2))
+```
+
+## Practical Implications for Journalists
+
+### Evaluating Poll Sample Sizes
+
+- **1,000-1,500**: Standard for national polls (margin of error ≈ ±3%)
+- **400-500**: Common for state polls (margin of error ≈ ±5%)
+- **100-200**: Subgroup analysis (margin of error ≈ ±7-10%)
+- **Under 100**: Generally too small for reliable conclusions
+
+### Red Flags
+
+Watch out for:
+
+- **Cherry-picked samples**: "We talked to 5 people and they all said..."
+- **Tiny subgroups**: "Among left-handed voters aged 18-24..." (might be n=15)
+- **No margin of error reported**: Reputable polls always include this
+- **Non-random sampling**: Internet polls, mall intercepts, etc. aren't representative
+
+### Best Practices
+
+When reporting on sampled data:
+
+1. **Always report the sample size**: "A poll of 876 registered voters..."
+2. **Include the margin of error**: "...with a margin of error of ±3.4%"
+3. **Note the sampling method**: "...conducted via random-digit dialing"
+4. **Be cautious with subgroups**: Small subgroups have large margins of error
+5. **Consider response rates**: Low response rates can introduce bias
+
+## Why Random Sampling Matters
+
+**Random sampling** means every member of the population has an equal chance of being selected. This is crucial because:
+
+- **It prevents bias**: You can't unconsciously select people who agree with you
+- **It allows statistical inference**: Math only works if samples are random
+- **It's representative**: Random samples tend to mirror the population
+
+**Non-random samples** (convenience samples) can be deeply misleading:
+- People who click on web polls aren't representative
+- People who respond to surveys differ from those who don't
+- Your Twitter followers don't represent all voters
+
+## Key Takeaways
+
+- **Samples should represent populations**: Random selection is crucial
+- **Larger samples are more accurate**: But with diminishing returns
+- **Every sample has uncertainty**: Expressed as margin of error
+- **Sample size affects precision**: Smaller samples = larger margins of error
+- **Report the details**: Always include sample size, method, and margin of error
+
+## Try It Yourself
+
+1. Re-run the code with a sample of 50 instead of 100. How does this affect the standard error?
+
+2. What would the margin of error be for a poll of 400 people? (Use the formula above)
+
+3. A news story says "63% of voters support the measure." The poll surveyed 1,200 people. What's the margin of error? Could the true support be less than 60%?
+
+Understanding sampling is fundamental to evaluating claims based on data. Next time you see a poll or survey reported in the news, you'll have the tools to assess whether the sample size and methodology support the conclusions being drawn.

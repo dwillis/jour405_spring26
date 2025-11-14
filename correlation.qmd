@@ -1,0 +1,337 @@
+# Correlation: Measuring Relationships
+
+Do wealthier countries have happier citizens? Do teams that score more points win more games? Do schools with more resources have better test scores? Correlation helps us measure and quantify relationships between variables.
+
+## What Is Correlation?
+
+**Correlation** measures the strength and direction of the linear relationship between two numeric variables.
+
+- **Strength**: How closely the variables move together (0 to 1)
+- **Direction**: Whether they move in the same direction (positive) or opposite directions (negative)
+
+**Correlation coefficient (r):**
+- **r = 1**: Perfect positive correlation (as one goes up, the other goes up proportionally)
+- **r = 0**: No correlation (no linear relationship)
+- **r = -1**: Perfect negative correlation (as one goes up, the other goes down)
+
+**Rules of thumb:**
+- **|r| < 0.3**: Weak correlation
+- **0.3 ≤ |r| < 0.7**: Moderate correlation
+- **|r| ≥ 0.7**: Strong correlation
+
+## Critical Warning: Correlation ≠ Causation
+
+**The most important rule in statistics:**
+
+Just because two variables are correlated doesn't mean one causes the other. There could be:
+
+- **Reverse causation**: B causes A, not A causes B
+- **Third variable**: C causes both A and B
+- **Coincidence**: Pure random chance
+- **Complex relationship**: Multiple factors interacting
+
+**Classic example:** Ice cream sales correlate with drowning deaths. Does ice cream cause drowning? No! Both increase in summer (the third variable).
+
+## Setting Up
+
+```{r setup, message=FALSE}
+library(tidyverse)
+```
+
+## Analyzing World Happiness Data
+
+We'll explore whether GDP per capita correlates with happiness across countries:
+
+```{r load-data, message=FALSE}
+happiness_url <- "https://raw.githubusercontent.com/VivekAgrawl/World-Happiness-Report-2023/refs/heads/main/whr2023.csv"
+happiness_data <- read_csv(happiness_url)
+
+# Clean and prepare data
+happiness_analysis <- happiness_data |>
+  select(
+    country = `Country name`,
+    happiness_score = `Happiness score`,
+    gdp_per_capita = `Logged GDP per capita`,
+    social_support = `Social support`,
+    life_expectancy = `Healthy life expectancy`,
+    freedom = `Freedom to make life choices`
+  ) |>
+  drop_na()
+
+# Look at the data
+head(happiness_analysis)
+```
+
+## Calculating Correlation
+
+Let's test the relationship between GDP per capita and happiness:
+
+```{r correlation-test}
+# Run correlation test
+cor_result <- cor.test(
+  happiness_analysis$gdp_per_capita,
+  happiness_analysis$happiness_score
+)
+
+print(cor_result)
+```
+
+**Interpreting the results:**
+
+- **correlation**: The r value (how strong the relationship is)
+- **p-value**: Whether the correlation is statistically significant
+- **95% confidence interval**: The range we're confident contains the true correlation
+
+## Visualizing Correlation
+
+A scatter plot helps us see the relationship:
+
+```{r scatter-plot, fig.width=10, fig.height=6}
+ggplot(happiness_analysis, aes(x = gdp_per_capita, y = happiness_score)) +
+  geom_point(aes(color = social_support, size = life_expectancy), alpha = 0.7) +
+  geom_smooth(method = "lm", se = TRUE, color = "darkgreen") +
+  geom_text(
+    aes(label = country),
+    data = happiness_analysis |>
+      filter(happiness_score > 7.5 | happiness_score < 3.5),
+    size = 3, hjust = -0.1, vjust = -0.1, check_overlap = TRUE
+  ) +
+  scale_color_viridis_c(name = "Social Support") +
+  scale_size_continuous(name = "Life Expectancy") +
+  labs(
+    title = "GDP per Capita vs. Happiness Score",
+    subtitle = paste("Pearson's r =", round(cor_result$estimate, 3),
+                     ", p-value =", format.pval(cor_result$p.value, digits = 2)),
+    x = "Log GDP per Capita",
+    y = "Happiness Score"
+  ) +
+  theme_light()
+```
+
+The scatter plot shows:
+- **Direction**: Upward slope indicates positive correlation
+- **Strength**: How tightly points cluster around the line
+- **Outliers**: Countries that don't follow the pattern
+- **Trend line**: The best-fit linear relationship
+
+## Correlation Matrix
+
+When you have multiple variables, a correlation matrix shows all pairwise correlations:
+
+```{r correlation-matrix}
+# Create correlation matrix
+cor_matrix <- happiness_analysis |>
+  select(-country) |>
+  cor() |>
+  round(3)
+
+# Display as a nice table
+knitr::kable(cor_matrix)
+```
+
+## Visualizing the Correlation Matrix
+
+A heatmap makes patterns easier to spot:
+
+```{r correlation-heatmap, fig.width=10, fig.height=8}
+happiness_analysis |>
+  select(-country) |>
+  cor() |>
+  round(3) |>
+  as.data.frame() |>
+  rownames_to_column("Variable") |>
+  pivot_longer(-Variable, names_to = "Measure", values_to = "Correlation") |>
+  ggplot(aes(x = Variable, y = Measure, fill = Correlation)) +
+  geom_tile() +
+  scale_fill_gradient2(
+    low = "blue",
+    mid = "white",
+    high = "red",
+    midpoint = 0
+  ) +
+  geom_text(aes(label = round(Correlation, 2)), color = "black", size = 3) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  labs(title = "Correlation Matrix of World Happiness Indicators")
+```
+
+**Reading the heatmap:**
+- **Red**: Strong positive correlation
+- **Blue**: Strong negative correlation
+- **White**: No correlation
+- **Diagonal**: Always 1 (a variable perfectly correlates with itself)
+
+## Comparing Different Correlations
+
+Let's compare how different factors correlate with happiness:
+
+```{r compare-correlations}
+# Calculate correlations with happiness
+correlations <- tibble(
+  Factor = c("GDP per Capita", "Social Support", "Life Expectancy", "Freedom"),
+  Correlation = c(
+    cor(happiness_analysis$gdp_per_capita, happiness_analysis$happiness_score),
+    cor(happiness_analysis$social_support, happiness_analysis$happiness_score),
+    cor(happiness_analysis$life_expectancy, happiness_analysis$happiness_score),
+    cor(happiness_analysis$freedom, happiness_analysis$happiness_score)
+  )
+) |>
+  arrange(desc(abs(Correlation)))
+
+knitr::kable(correlations, digits = 3)
+```
+
+## Visualizing Multiple Relationships
+
+```{r multiple-relationships, fig.width=12, fig.height=10}
+happiness_long <- happiness_analysis |>
+  pivot_longer(
+    cols = c(gdp_per_capita, social_support, life_expectancy, freedom),
+    names_to = "factor",
+    values_to = "value"
+  )
+
+ggplot(happiness_long, aes(x = value, y = happiness_score)) +
+  geom_point(alpha = 0.5, color = "steelblue") +
+  geom_smooth(method = "lm", se = TRUE, color = "darkred") +
+  facet_wrap(~factor, scales = "free_x", ncol = 2) +
+  theme_minimal() +
+  labs(
+    title = "Multiple Factors vs. Happiness Score",
+    x = "Factor Value",
+    y = "Happiness Score"
+  )
+```
+
+## Testing Correlation Significance
+
+Not all correlations are meaningful. The p-value tells us if a correlation is statistically significant:
+
+```{r significance-tests}
+# Test all correlations with happiness
+factors <- c("gdp_per_capita", "social_support", "life_expectancy", "freedom")
+
+correlation_tests <- map_df(factors, function(factor) {
+  test <- cor.test(
+    happiness_analysis[[factor]],
+    happiness_analysis$happiness_score
+  )
+
+  tibble(
+    Factor = factor,
+    Correlation = test$estimate,
+    P_Value = test$p.value,
+    Significant = test$p.value < 0.05
+  )
+})
+
+knitr::kable(correlation_tests, digits = 4)
+```
+
+**Interpretation:**
+- **P-value < 0.05**: Statistically significant correlation
+- **P-value ≥ 0.05**: Could be due to random chance
+
+## Spotting Non-Linear Relationships
+
+Correlation only measures **linear** relationships. Some relationships are curved:
+
+```{r nonlinear-example, eval=FALSE}
+# Example of a non-linear relationship
+set.seed(42)
+nonlinear <- tibble(
+  x = runif(100, 0, 10),
+  y = x^2 + rnorm(100, 0, 5)
+)
+
+cor.test(nonlinear$x, nonlinear$y)$estimate  # Might show weak correlation
+
+ggplot(nonlinear, aes(x = x, y = y)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +  # Linear fit
+  geom_smooth(se = FALSE, color = "blue") +  # Curved fit
+  theme_minimal() +
+  labs(title = "Linear Correlation Misses Curved Relationship")
+```
+
+Always visualize your data! Correlation alone can miss important patterns.
+
+## Journalistic Applications
+
+### Finding Story Angles
+
+**Strong correlations** suggest potential stories:
+- "Countries with higher social support show significantly higher happiness"
+- "GDP explains 65% of variation in national happiness scores"
+
+**Weak or absent correlations** can also be newsworthy:
+- "Despite conventional wisdom, X shows no correlation with Y"
+- "New study challenges link between A and B"
+
+### Red Flags
+
+Be skeptical when:
+- **Small sample size**: n < 30 can produce spurious correlations
+- **Cherry-picked variables**: Testing hundreds of correlations increases false positives
+- **Causal claims**: "Correlation proves X causes Y" is always wrong
+- **No visualization**: Always plot your data
+- **Ignoring context**: Subject matter expertise matters
+
+### Best Practices
+
+When reporting correlations:
+
+1. **Report the coefficient**: "A strong positive correlation (r = 0.78)"
+2. **Note significance**: "This relationship is statistically significant (p < 0.001)"
+3. **Avoid causal language**: Say "associated with" not "causes"
+4. **Show the data**: Include a scatter plot
+5. **Provide context**: What does this correlation mean in practice?
+6. **Consider confounders**: What other factors might explain the relationship?
+
+## Example News Reporting
+
+**Poor:** "Study proves money buys happiness"
+
+**Better:** "Countries with higher GDP per capita show significantly higher happiness scores (r = 0.78, p < 0.001), though the relationship isn't purely linear. Social support and life expectancy also show strong associations with happiness, suggesting multiple factors contribute to national well-being."
+
+## Common Mistakes to Avoid
+
+1. **Assuming causation**: Correlation doesn't prove cause and effect
+2. **Ignoring outliers**: A few extreme values can skew correlation
+3. **Not checking linearity**: Correlation measures linear relationships only
+4. **Overlooking sample size**: Small samples produce unreliable correlations
+5. **Cherry-picking**: Only reporting significant correlations ignores null results
+6. **Forgetting context**: Numbers alone don't tell the full story
+
+## The Danger of Spurious Correlations
+
+Some correlations are pure coincidence. Famous examples:
+
+- Per capita cheese consumption correlates with deaths by bedsheet tangling
+- Nicolas Cage movies correlate with swimming pool drownings
+- Number of people who drowned in pools correlates with films Nicolas Cage appeared in
+
+Always ask: **Does this relationship make sense? What's the mechanism?**
+
+## Key Takeaways
+
+- **Correlation measures linear relationships** between two variables
+- **Range from -1 to 1**, with 0 meaning no correlation
+- **Strong correlations** suggest relationships worth investigating
+- **Correlation ≠ Causation**: Never assume one variable causes another
+- **Always visualize** your data with scatter plots
+- **Check significance** using p-values
+- **Consider confounders** and alternative explanations
+- **Report responsibly**: Use precise language, avoid causal claims
+
+## Try It Yourself
+
+1. Which factor shows the strongest correlation with happiness? The weakest?
+
+2. Create a scatter plot showing the relationship between life expectancy and happiness. How does it compare to the GDP relationship?
+
+3. Can you find any surprising pairs of variables that show strong correlation? What might explain these relationships?
+
+4. Look at the outlier countries in the plots. What makes them unusual?
+
+Correlation is a powerful tool for discovering relationships in data, but it's just the beginning. In the next chapter, we'll explore regression analysis, which lets us quantify relationships and make predictions.

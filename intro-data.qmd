@@ -1,0 +1,165 @@
+# Getting Started with Data
+
+Before we dive into statistical analysis, we need to understand the basics of working with data in R. This chapter will introduce you to the fundamental concepts and tools you'll use throughout this book.
+
+## Setting Up Your Environment
+
+Every R analysis begins by loading the necessary libraries. For most of our work, we'll use the tidyverse, a collection of R packages designed for data science.
+
+```{r setup, message=FALSE}
+library(tidyverse)
+```
+
+The tidyverse includes several essential packages:
+
+- **dplyr**: For data manipulation
+- **ggplot2**: For creating visualizations
+- **readr**: For reading data files
+- **tidyr**: For reshaping data
+- **tibble**: For modern data frames
+
+## Loading Data
+
+Most journalism data comes from external sources like CSV files, APIs, or databases. The most common format you'll encounter is CSV (comma-separated values).
+
+```{r, eval=FALSE}
+# Load data from a CSV file
+data <- read_csv("path/to/your/file.csv")
+
+# Load data from a URL
+data <- read_csv("https://example.com/data.csv")
+```
+
+When you load data, R creates a data frame (or tibble) - think of it as a spreadsheet with rows and columns.
+
+## Understanding Your Data
+
+Before analyzing any dataset, you should always explore it first. Here are the essential commands:
+
+```{r, eval=FALSE}
+# View the first few rows
+head(data)
+
+# Get a summary of the structure
+glimpse(data)
+
+# Get summary statistics
+summary(data)
+
+# Count the number of rows
+nrow(data)
+
+# See the column names
+names(data)
+```
+
+## Basic Data Manipulation
+
+The tidyverse uses a "pipe" operator (`|>` or `%>%`) that lets you chain operations together. Think of it as saying "and then..."
+
+```{r, eval=FALSE}
+data |>
+  filter(year == 2023) |>     # Keep only 2023 data
+  select(county, population) |> # Select specific columns
+  arrange(desc(population))    # Sort by population, descending
+```
+
+### Common Operations
+
+**Filtering rows:**
+```{r, eval=FALSE}
+# Keep only rows where population > 100000
+data |> filter(population > 100000)
+```
+
+**Selecting columns:**
+```{r, eval=FALSE}
+# Keep only specific columns
+data |> select(county, crime_total, population)
+```
+
+**Creating new columns:**
+```{r, eval=FALSE}
+# Add a new calculated column
+data |> mutate(crime_rate = crime_total / population * 100000)
+```
+
+**Grouping and summarizing:**
+```{r, eval=FALSE}
+# Calculate statistics by group
+data |>
+  group_by(year) |>
+  summarize(avg_crime = mean(crime_total))
+```
+
+## Dealing with Messy Column Names
+
+Real-world data often has column names with spaces or special characters. The janitor package helps clean these up:
+
+```{r, eval=FALSE}
+library(janitor)
+
+# Clean column names (lowercase, replace spaces with underscores)
+data <- data |> clean_names()
+```
+
+After using `clean_names()`, a column called "Total Crime" becomes "total_crime", which is much easier to work with in R.
+
+## The Importance of Rates
+
+One of the most common mistakes in data journalism is comparing raw numbers when you should be comparing rates.
+
+**Example:** City A has 1,000 crimes and City B has 500 crimes. Which city is more dangerous?
+
+**Answer:** You can't tell without knowing the populations!
+
+If City A has 1 million people and City B has 10,000 people:
+- City A crime rate: (1,000 / 1,000,000) × 100,000 = 100 per 100,000 people
+- City B crime rate: (500 / 10,000) × 100,000 = 5,000 per 100,000 people
+
+City B is actually much more dangerous on a per-capita basis.
+
+### Calculating Rates
+
+The standard formula for a rate is:
+
+```
+rate = (count / population) × standard_unit
+```
+
+Common standard units:
+- Per 100,000 for crime rates
+- Per 1,000 for birth/death rates
+- Per 10,000 for some disease rates
+
+```{r, eval=FALSE}
+data |>
+  mutate(crime_rate = (total_crimes / population) * 100000)
+```
+
+## Best Practices
+
+As you work with data, keep these principles in mind:
+
+1. **Always check your data first**: Use `head()`, `glimpse()`, and `summary()` before analyzing
+2. **Document your work**: Add comments to explain what your code does
+3. **Keep raw data raw**: Never overwrite your original data file
+4. **Calculate rates, not just counts**: Almost always more meaningful for comparisons
+5. **Check for missing values**: Use `is.na()` to find them
+6. **Verify your results**: Do spot checks to make sure calculations make sense
+
+## Common Pitfalls
+
+Watch out for these frequent mistakes:
+
+- **Comparing raw numbers instead of rates** when populations differ
+- **Forgetting to filter out missing values** before calculations
+- **Not checking data types** (numbers stored as text won't calculate correctly)
+- **Assuming data is clean** without inspecting it first
+- **Overwriting original data** instead of creating new columns
+
+## What's Next
+
+Now that you understand the basics of working with data in R, we're ready to apply these skills to real journalism scenarios. In the next chapter, we'll work with crime data to learn how to calculate meaningful rates and draw journalistic insights from data.
+
+Remember: the goal isn't just to run code, but to develop the analytical thinking that helps you find and tell important stories in data.

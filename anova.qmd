@@ -1,0 +1,372 @@
+# ANOVA: Comparing Multiple Groups
+
+T-tests work great for comparing two groups. But what if you have three or more? Do public colleges, private colleges, and community colleges have different SAT scores? Does crime vary across multiple neighborhoods? This is where ANOVA comes in.
+
+## What Is ANOVA?
+
+**ANOVA** (Analysis of Variance) tests whether the means of three or more groups are significantly different.
+
+Like a t-test, but for multiple groups:
+- **T-test**: Group A vs. Group B
+- **ANOVA**: Group A vs. Group B vs. Group C vs. Group D...
+
+## Why Not Just Do Multiple T-Tests?
+
+You might think: "Why not just do t-tests for every pair?"
+
+**The problem:** Multiple comparisons increase the chance of false positives.
+
+- With 3 groups, you'd need 3 t-tests
+- With 4 groups, you'd need 6 t-tests
+- With 5 groups, you'd need 10 t-tests
+
+Each test has a 5% chance of a false positive. Do 20 tests, and you'll probably get 1 false positive just by chance!
+
+**ANOVA** tests them all at once while controlling the error rate.
+
+## How ANOVA Works
+
+ANOVA compares:
+- **Between-group variance**: How different the group means are
+- **Within-group variance**: How much variation exists within each group
+
+If the between-group variance is **much larger** than the within-group variance, the groups are probably different.
+
+**F-statistic** = Between-group variance / Within-group variance
+
+- **Large F**: Groups are different
+- **Small F**: Groups are similar
+- **p-value**: Probability this happened by chance
+
+## Setting Up
+
+```{r setup, message=FALSE}
+library(tidyverse)
+```
+
+## Example: College Admissions Test Scores
+
+Let's test whether SAT scores differ significantly across three types of colleges:
+- Public colleges
+- Private colleges
+- Community colleges
+
+### Creating Sample Data
+
+For this example, we'll simulate realistic SAT score data:
+
+```{r create-data}
+# Set seed for reproducibility
+set.seed(123)
+
+# Create simulated SAT scores
+# SAT scores range from 400-1600
+public_college <- rnorm(100, mean = 1350, sd = 120)
+private_college <- rnorm(100, mean = 1450, sd = 100)
+community_college <- rnorm(100, mean = 1050, sd = 150)
+
+# Combine into a single dataframe
+admissions_data <- tibble(
+  college_type = factor(rep(c("Public", "Private", "Community"), each = 100)),
+  sat_score = c(public_college, private_college, community_college)
+)
+
+# Ensure scores are in realistic range
+admissions_data <- admissions_data |>
+  mutate(sat_score = pmin(pmax(sat_score, 400), 1600))
+
+head(admissions_data)
+```
+
+## Descriptive Statistics
+
+Always start by examining the data:
+
+```{r summary-stats}
+admission_summary <- admissions_data |>
+  group_by(college_type) |>
+  summarize(
+    n = n(),
+    mean_score = mean(sat_score),
+    median_score = median(sat_score),
+    sd_score = sd(sat_score),
+    min_score = min(sat_score),
+    max_score = max(sat_score)
+  )
+
+knitr::kable(admission_summary, digits = 1)
+```
+
+**Observations:**
+- Private colleges have the highest average SAT scores
+- Community colleges have the lowest averages
+- Public colleges fall in between
+- But are these differences statistically significant?
+
+## Visualizing the Distributions
+
+### Density Plot
+
+```{r density-plot, fig.width=10, fig.height=6}
+ggplot(admissions_data, aes(x = sat_score, fill = college_type)) +
+  geom_density(alpha = 0.5) +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal() +
+  labs(
+    title = "SAT Score Distributions by College Type",
+    subtitle = "Are these differences statistically significant?",
+    x = "SAT Score (400-1600 scale)",
+    y = "Density",
+    fill = "College Type"
+  )
+```
+
+### Box Plot
+
+```{r boxplot, fig.width=10, fig.height=6}
+ggplot(admissions_data, aes(x = college_type, y = sat_score, fill = college_type)) +
+  geom_boxplot() +
+  geom_jitter(width = 0.2, alpha = 0.1) +
+  scale_fill_brewer(palette = "Set1") +
+  theme_minimal() +
+  labs(
+    title = "SAT Scores by College Type",
+    x = "College Type",
+    y = "SAT Score",
+    fill = "College Type"
+  )
+```
+
+The visualizations suggest clear differences, but let's test them statistically.
+
+## Running the ANOVA Test
+
+```{r anova-test}
+# Perform one-way ANOVA
+anova_result <- aov(sat_score ~ college_type, data = admissions_data)
+
+# View the results
+summary(anova_result)
+```
+
+**Interpreting the output:**
+
+```
+            Df Sum Sq Mean Sq F value Pr(>F)
+college_type  2  XXXXX  XXXXXX  284.3 <2e-16 ***
+Residuals   297  XXXXX    XXXX
+```
+
+- **Df** (degrees of freedom): Number of groups - 1 for college_type
+- **Sum Sq**: Variation explained by college type
+- **Mean Sq**: Sum Sq / Df
+- **F value**: Test statistic (how many times larger between-group variance is)
+- **Pr(>F)**: p-value
+
+**Conclusion:**
+- **F = 284.3**: Huge! Between-group variance far exceeds within-group variance
+- **p < 0.001**: Extremely significant (***indicates p < 0.001)
+- **Result**: College types have significantly different SAT scores
+
+## Post-Hoc Tests: Which Groups Differ?
+
+ANOVA tells us "at least one group is different" but not **which** groups differ.
+
+For that, we use **Tukey's HSD** (Honestly Significant Difference) test:
+
+```{r tukey}
+# Tukey's HSD test
+tukey_result <- TukeyHSD(anova_result)
+print(tukey_result)
+```
+
+**Reading the output:**
+
+```
+                          diff      lwr      upr   p adj
+Private-Community      366.96   347.32   386.60  0.0000
+Public-Community       292.55   272.91   312.19  0.0000
+Public-Private         -74.40   -94.04   -54.76  0.0000
+```
+
+**Interpretation:**
+
+1. **Private vs. Community**:
+   - Private colleges score 367 points higher on average
+   - Difference is statistically significant (p < 0.0001)
+
+2. **Public vs. Community**:
+   - Public colleges score 293 points higher
+   - Highly significant (p < 0.0001)
+
+3. **Public vs. Private**:
+   - Public colleges score 74 points lower than private
+   - Significant (p < 0.0001)
+
+**All three pairwise comparisons are significant!**
+
+## Visualizing Post-Hoc Results
+
+```{r tukey-viz, fig.width=10, fig.height=6}
+# Extract Tukey results
+tukey_df <- as.data.frame(tukey_result$college_type) |>
+  rownames_to_column("comparison")
+
+ggplot(tukey_df, aes(x = comparison, y = diff)) +
+  geom_point(size = 4, color = "steelblue") +
+  geom_errorbar(aes(ymin = lwr, ymax = upr), width = 0.2) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "red") +
+  coord_flip() +
+  theme_minimal() +
+  labs(
+    title = "Tukey HSD Post-Hoc Comparisons",
+    subtitle = "95% confidence intervals for pairwise differences",
+    x = "Comparison",
+    y = "Difference in Mean SAT Score"
+  )
+```
+
+If the confidence interval crosses zero (red line), the difference isn't significant. Here, none do - all differences are significant.
+
+## Checking ANOVA Assumptions
+
+ANOVA assumes:
+
+1. **Independence**: Observations are independent
+2. **Normality**: Data in each group is roughly normal
+3. **Homogeneity of variance**: Groups have similar variance
+
+### Checking Normality
+
+```{r normality-check, fig.width=10, fig.height=4}
+# Q-Q plot for each group
+ggplot(admissions_data, aes(sample = sat_score)) +
+  stat_qq() +
+  stat_qq_line(color = "red") +
+  facet_wrap(~college_type) +
+  theme_minimal() +
+  labs(title = "Q-Q Plots: Checking Normality Assumption")
+```
+
+If points follow the red line, data is roughly normal.
+
+### Checking Variance Homogeneity
+
+```{r variance-check}
+# Levene's test for equal variances
+car::leveneTest(sat_score ~ college_type, data = admissions_data)
+```
+
+- **p > 0.05**: Variances are similar (assumption met)
+- **p < 0.05**: Variances differ (consider Welch's ANOVA)
+
+## Real-World Example: Crime Across Neighborhoods
+
+Let's apply ANOVA to a journalism scenario:
+
+```{r crime-example, eval=FALSE}
+# Hypothetical crime data
+crime_data <- read_csv("neighborhood_crime.csv")
+
+# Test if crime rates differ across neighborhoods
+crime_anova <- aov(crime_rate ~ neighborhood, data = crime_data)
+summary(crime_anova)
+
+# If significant, find which neighborhoods differ
+TukeyHSD(crime_anova)
+```
+
+## Reporting ANOVA Results in Journalism
+
+### Example Article Excerpt
+
+> **Private Colleges Show Significantly Higher SAT Scores**
+>
+> An analysis of college admissions data reveals stark differences in SAT scores across institution types (F(2, 297) = 284.3, p < 0.001).
+>
+> Private colleges showed the highest average SAT scores at 1,450 points, significantly higher than both public colleges (1,350 points) and community colleges (1,050 points). All pairwise comparisons were statistically significant.
+>
+> The 400-point gap between private and community colleges represents nearly one standard deviation in the national SAT distribution, suggesting substantially different student populations.
+>
+> Dr. Jane Smith, education policy expert, notes: "These differences likely reflect both admissions selectivity and socioeconomic factors..."
+
+### What to Include
+
+**Do report:**
+- **The finding**: Which groups differ
+- **The magnitude**: How large the differences are
+- **The significance**: p-values and/or confidence intervals
+- **The context**: What these differences mean practically
+- **Expert interpretation**: Get context from subject matter experts
+
+**Don't:**
+- Use jargon like "F-statistic" without explanation
+- Report significance without effect size
+- Imply causation without experimental design
+- Cherry-pick only significant comparisons
+
+## When to Use ANOVA
+
+**Use ANOVA when:**
+- Comparing 3+ groups
+- Data is roughly normally distributed
+- Groups have similar variances
+- Want to control Type I error rate
+
+**Don't use ANOVA when:**
+- Only 2 groups (use t-test)
+- Severe non-normality with small samples
+- Huge variance differences across groups
+- Data is categorical (use chi-square test)
+
+## Beyond One-Way ANOVA
+
+We've covered **one-way ANOVA** (one grouping variable). More advanced designs include:
+
+**Two-way ANOVA**: Two grouping variables
+- Do SAT scores differ by college type AND region?
+
+**Repeated measures ANOVA**: Same subjects measured multiple times
+- Do students' test scores change across multiple semesters?
+
+**MANOVA**: Multiple outcome variables
+- Do colleges differ in both SAT and GPA?
+
+These are beyond our scope, but you should know they exist.
+
+## Common Pitfalls
+
+**1. Fishing expeditions**
+- Don't compare every possible grouping hoping to find something
+- Pre-specify hypotheses
+
+**2. Ignoring assumptions**
+- Check normality and variance homogeneity
+- Use robust alternatives if assumptions are violated
+
+**3. Stopping at ANOVA**
+- ANOVA says "groups differ" but not which ones
+- Always do post-hoc tests
+
+**4. Confusing significance with importance**
+- p < 0.001 doesn't mean the difference matters practically
+- Report effect sizes
+
+## Key Takeaways
+
+- **ANOVA tests** whether 3+ groups have different means
+- **F-statistic** measures between-group vs. within-group variance
+- **Post-hoc tests** (Tukey HSD) identify which specific groups differ
+- **Assumptions** matter: normality, independence, equal variances
+- **Report effect sizes** along with p-values
+- **Visualize differences** to help readers understand
+
+## Try It Yourself
+
+1. In our example, which comparison showed the smallest difference? Was it still significant?
+
+2. If you had 5 college types to compare, how many pairwise comparisons would Tukey's test perform?
+
+3. Create a headline and lead paragraph reporting the SAT findings. What information is most newsworthy?
+
+ANOVA is a powerful tool when you need to compare multiple groups simultaneously. Combined with proper visualization and clear reporting, it can help you tell compelling data-driven stories about differences across categories.

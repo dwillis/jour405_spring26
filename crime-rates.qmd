@@ -1,0 +1,213 @@
+# Calculating Crime Rates
+
+One of the most important skills in data journalism is knowing when to use rates instead of raw counts. Nowhere is this more critical than in crime reporting, where misleading comparisons can create false impressions about public safety.
+
+## The Problem with Raw Numbers
+
+Imagine you're covering a story about crime trends in Maryland. You pull the latest data and see that Baltimore City had far more crimes than any other jurisdiction in the state. The headline practically writes itself: "Baltimore City Leads State in Crime."
+
+But wait. Baltimore City also has more people than most other Maryland jurisdictions. Is it really more dangerous, or does it just have more people? To answer that question fairly, we need to calculate **crime rates** that account for population differences.
+
+## Setting Up
+
+Let's start by loading the libraries we'll need:
+
+```{r setup, message=FALSE}
+library(tidyverse)
+library(janitor)
+```
+
+The `janitor` package is incredibly useful for cleaning up messy column names, which is something we'll almost always need to do with real-world data.
+
+## Loading Crime Data
+
+We'll work with Maryland's annual crime statistics:
+
+```{r load-data, message=FALSE}
+crimes <- read_csv("https://raw.githubusercontent.com/dwillis/jour405/refs/heads/main/data/md_annual_crime.csv") |>
+  clean_names()
+
+# Look at the structure
+glimpse(crimes)
+```
+
+Notice how `clean_names()` converted column names like "Grand Total" to "grand_total" - much easier to work with in R!
+
+## Choosing the Right Unit
+
+Before we calculate any rates, we need to decide on our **standard unit**. For crime rates, the convention is to use **per 10,000 people**, though you might also see per 100,000 for serious crimes.
+
+The formula is:
+
+```
+crime_rate = (number_of_crimes / population) × 10000
+```
+
+This tells us: "If this jurisdiction had exactly 10,000 people, how many crimes would we expect, proportionally?"
+
+## Calculating Total Crime Rate
+
+Let's calculate the overall crime rate for each year:
+
+```{r total-rate}
+crimes <- crimes |>
+  mutate(total_rate = grand_total / population * 10000)
+
+# View the results
+crimes |>
+  select(year, jurisdiction, population, grand_total, total_rate) |>
+  arrange(desc(total_rate))
+```
+
+Now we can make fair comparisons between jurisdictions of different sizes.
+
+## Breaking Down by Crime Type
+
+Maryland tracks both violent crimes and property crimes. Let's calculate separate rates for each:
+
+```{r crime-type-rates}
+crimes_with_rates <- crimes |>
+  mutate(
+    violent_rate = violent_crime_total / population * 10000,
+    property_rate = property_crime_total / population * 10000
+  )
+
+# Look at violent crime rates
+crimes_with_rates |>
+  select(year, jurisdiction, violent_rate) |>
+  arrange(desc(violent_rate))
+```
+
+## Analyzing Trends
+
+Now that we have rates, we can ask meaningful questions:
+
+**Which jurisdictions have the highest crime rates?**
+
+```{r highest-rates}
+# Most recent year's data
+crimes_with_rates |>
+  filter(year == max(year)) |>
+  select(jurisdiction, total_rate, violent_rate, property_rate) |>
+  arrange(desc(total_rate))
+```
+
+**How have crime rates changed over time?**
+
+```{r trend-analysis}
+# Calculate change from first to last year
+crime_trends <- crimes_with_rates |>
+  group_by(jurisdiction) |>
+  arrange(year) |>
+  summarize(
+    first_year = first(year),
+    first_rate = first(total_rate),
+    last_year = last(year),
+    last_rate = last(total_rate),
+    change = last_rate - first_rate,
+    pct_change = (change / first_rate) * 100
+  ) |>
+  arrange(desc(abs(change)))
+
+crime_trends
+```
+
+## Visualizing Crime Rates
+
+A visualization can help readers understand trends more quickly:
+
+```{r crime-viz, fig.width=10, fig.height=6}
+# Focus on a few major jurisdictions
+major_jurisdictions <- c("Baltimore City", "Baltimore County",
+                         "Montgomery County", "Prince George's County")
+
+crimes_with_rates |>
+  filter(jurisdiction %in% major_jurisdictions) |>
+  ggplot(aes(x = year, y = total_rate, color = jurisdiction)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(
+    title = "Crime Rates in Major Maryland Jurisdictions",
+    subtitle = "Total crimes per 10,000 population",
+    x = "Year",
+    y = "Crime Rate (per 10,000)",
+    color = "Jurisdiction",
+    caption = "Source: Maryland crime statistics"
+  ) +
+  theme(legend.position = "bottom")
+```
+
+## Comparing Violent vs. Property Crime
+
+We can also visualize how different types of crime have changed:
+
+```{r crime-type-viz, fig.width=10, fig.height=6}
+crimes_with_rates |>
+  filter(jurisdiction == "Baltimore City") |>
+  select(year, violent_rate, property_rate) |>
+  pivot_longer(cols = c(violent_rate, property_rate),
+               names_to = "crime_type",
+               values_to = "rate") |>
+  ggplot(aes(x = year, y = rate, color = crime_type)) +
+  geom_line(size = 1.2) +
+  geom_point(size = 2) +
+  theme_minimal() +
+  labs(
+    title = "Violent vs. Property Crime Rates in Baltimore City",
+    subtitle = "Crimes per 10,000 population",
+    x = "Year",
+    y = "Crime Rate (per 10,000)",
+    color = "Crime Type"
+  ) +
+  scale_color_manual(
+    values = c("violent_rate" = "#d62728", "property_rate" = "#1f77b4"),
+    labels = c("Property Crime", "Violent Crime")
+  )
+```
+
+## Journalistic Interpretation
+
+When reporting on crime rates, consider:
+
+1. **Context matters**: A 10% increase sounds alarming, but is it from a historically low baseline?
+
+2. **Population changes**: If population decreased but crime stayed constant, the rate would increase even though the actual number of crimes didn't change.
+
+3. **Comparison groups**: Compare to similar jurisdictions, not just raw rankings.
+
+4. **Statistical significance**: Small changes in rates might just be random variation. (We'll learn about this in later chapters.)
+
+5. **What's missing**: Crime statistics reflect reported crimes. Many crimes go unreported, and reporting patterns may vary by jurisdiction.
+
+## Common Mistakes to Avoid
+
+**Don't:**
+- Compare raw crime totals between jurisdictions of different sizes
+- Forget to specify your rate unit (per 1,000? per 100,000?)
+- Ignore population changes over time
+- Cherry-pick time periods to show dramatic increases or decreases
+
+**Do:**
+- Always calculate rates when comparing different populations
+- Be clear about what you're measuring (all crimes? violent crimes?)
+- Show trends over multiple years, not just year-to-year changes
+- Provide context about what the numbers mean for residents
+
+## Key Takeaways
+
+- **Rates allow fair comparisons** between jurisdictions of different sizes
+- **Choose the right unit** (per 10,000, per 100,000) based on the frequency of what you're measuring
+- **The formula is always**: (count / population) × standard_unit
+- **Clean column names** with janitor's `clean_names()` before analyzing
+- **Visualizations help** readers understand trends and patterns
+
+## Try It Yourself
+
+Using this same dataset, try to answer these questions:
+
+1. Which Maryland jurisdiction had the largest **decrease** in crime rate over the time period?
+2. Which jurisdiction had the highest violent crime rate in the most recent year?
+3. Is there a correlation between violent crime rates and property crime rates? (Hint: we'll learn more about correlation in Chapter 5!)
+
+Crime statistics are one of the most commonly reported datasets in journalism. By calculating proper rates and providing context, you can help your readers understand public safety trends accurately and fairly.
