@@ -1,43 +1,54 @@
 # Survey Weighting: Making Samples Representative
 
-"Our poll shows 55% support the measure!" But who did you poll? If your sample has too many college graduates or too few young people, your results might not reflect the actual population. Survey weighting fixes this problem.
+The press release from the polling firm hits your inbox three weeks before Election Day: "Exclusive Poll: Mayor Johnson leads 54-43!" Your editor wants it for the front page.
 
-## The Problem
+But you dig into the methodology section buried at the bottom: "Survey of 823 likely voters." You call the polling firm for details. How did they define "likely voters"? How did they reach them?
 
-Survey samples rarely match the population perfectly:
+The pollster explains: "We called landlines during business hours." You pause. Who has landlines anymore? Who's home on a Tuesday afternoon? Retirees, mostly. Young people have cell phones. Working people are at their jobs.
 
-- **Some groups respond more**: College graduates, older people, women
-- **Some respond less**: Young people, minorities, low-income residents
-- **Convenience samples**: Online polls only reach certain demographics
+Your sample is skewed. It over-represents older people and under-represents younger ones. If those groups vote differently—and they almost always do—your poll doesn't represent the electorate. It represents the people you happened to reach.
 
-**Without weighting**, a sample of 1,000 might actually represent a skewed subset of the population.
+This is where **survey weighting** comes in. It's a mathematical fix for an inevitable problem: your sample never perfectly matches the population you're trying to understand.
 
-**With weighting**, we adjust responses so the sample matches population demographics.
+## The Fundamental Problem
 
-## What Is Survey Weighting?
+Real-world surveys always have the same challenge: some types of people respond more than others.
 
-Survey weighting adjusts the "volume" on different voices:
+**Who over-responds:**
+- Older people (they answer phones)
+- Women (higher response rates)
+- College graduates (they like surveys)
+- White people (demographic reality of sampling frames)
+- Politically engaged people (they care about polls)
 
-**Give more weight to underrepresented groups:**
-- If you have too few young people, each young person's response counts as more than one
+**Who under-responds:**
+- Young people (ignore calls, use cell phones exclusively)
+- Minorities (harder to reach, lower trust in institutions)
+- Low-income residents (multiple jobs, no time)
+- Renters who move frequently (outdated contact info)
 
-**Give less weight to overrepresented groups:**
-- If you have too many college graduates, each one's response counts as less than one
+If you just count responses, you're hearing disproportionately from some groups and not enough from others. And if those groups have different opinions—they usually do—your results are biased.
 
-**The goal:** Make your sample look like the population in terms of key demographics.
+## What Weighting Does
+
+Survey weighting adjusts the "volume" on different voices to match the population.
+
+**Simple example:**
+- Your sample: 70% women, 30% men
+- Actual population: 50% women, 50% men
+- Solution: Give each woman's response less weight (count as ~0.71 people), give each man's response more weight (count as ~1.67 people)
+
+Now your weighted sample reflects the actual gender split, even though your raw sample didn't.
 
 ## How Weights Work
 
-Each respondent gets a **weight** that shows how much their response "counts":
+Each survey respondent gets a **weight** that shows how many people they represent:
 
-- **Weight = 1.0**: Counts as exactly one person (properly represented)
-- **Weight = 0.5**: Counts as half a person (overrepresented)
-- **Weight = 2.0**: Counts as two people (underrepresented)
+- **Weight = 1.0**: This person represents exactly themselves (properly represented in sample)
+- **Weight = 0.5**: This person represents half a person (their group is over-represented)
+- **Weight = 2.0**: This person represents two people (their group is under-represented)
 
-**Example:**
-- Your sample: 60% college grads, 40% non-college
-- Population: 40% college grads, 60% non-college
-- Give college grads weight < 1.0, non-college weight > 1.0
+When analyzing the data, you sum weights instead of counting people.
 
 ## Setting Up
 
@@ -46,9 +57,9 @@ library(tidyverse)
 library(knitr)
 ```
 
-## Example: Voter Survey Data
+## Working with Real Survey Data
 
-We'll use data from a 2020 survey about voting behavior:
+Let's use data from a 2020 survey about voting behavior. The survey asked people if they planned to vote, and pollsters weighted responses to match population demographics:
 
 ```{r load-data, message=FALSE}
 nonvoters_data <- read_csv("https://raw.githubusercontent.com/dwillis/jour405_files/refs/heads/main/nonvoters_data.csv")
@@ -57,59 +68,65 @@ glimpse(nonvoters_data)
 ```
 
 **Key variables:**
-- `weight`: Survey weight for each respondent
+- `weight`: The survey weight for each respondent
 - `Q21`: Voting intention (1=Yes, 2=No, 3=Unsure)
-- `voter_category`: Past voting history (always/sporadic/rarely-never)
+- `voter_category`: Past voting history
 - Demographics: race, gender, education, income
 
-## Understanding the Weights
+## Examining the Weights
 
-Let's examine the distribution of weights:
+Let's look at how the weights are distributed:
 
-```{r examine-weights}
+```{r examine-weights, fig.width=10, fig.height=6}
 # Summary statistics
 summary(nonvoters_data$weight)
 
 # Histogram of weights
 ggplot(nonvoters_data, aes(x = weight)) +
   geom_histogram(bins = 30, fill = "steelblue", color = "white") +
+  geom_vline(xintercept = 1.0, color = "red", linetype = "dashed", linewidth = 1) +
   theme_minimal() +
   labs(
     title = "Distribution of Survey Weights",
-    subtitle = "Most weights cluster around 1.0",
+    subtitle = "Red line shows weight = 1.0 (properly represented); most cluster near this",
     x = "Weight",
-    y = "Count of Respondents"
+    y = "Number of Respondents"
   )
 ```
 
-**Observations:**
-- Weights range from ~0.2 to ~3.0
-- Most cluster around 1.0
-- Some respondents count as much more or much less than one person
+**What this tells us:**
+- Most weights cluster around 1.0 (sample reasonably represents these people)
+- Some weights are as low as 0.2 (very over-represented)
+- Some weights are as high as 3.0 (very under-represented)
 
-## What Different Weights Mean
+## Interpreting Specific Weights
+
+Here's what different weights mean:
 
 ```{r weight-examples}
-# Examples of different weights
 weight_examples <- tibble(
   Weight = c(0.25, 0.50, 1.00, 1.50, 2.50),
   Interpretation = c(
-    "Counts as 1/4 person (very overrepresented)",
-    "Counts as 1/2 person (overrepresented)",
-    "Counts as exactly 1 person (properly represented)",
-    "Counts as 1.5 people (underrepresented)",
-    "Counts as 2.5 people (very underrepresented)"
+    "Counts as 1/4 person (group very overrepresented in sample)",
+    "Counts as 1/2 person (group moderately overrepresented)",
+    "Counts as exactly 1 person (group properly represented)",
+    "Counts as 1.5 people (group moderately underrepresented)",
+    "Counts as 2.5 people (group very underrepresented)"
   )
 )
 
-kable(weight_examples)
+kable(weight_examples, caption = "What different weights mean")
 ```
 
-## Unweighted vs. Weighted Analysis
+## The Critical Comparison: Weighted vs. Unweighted
 
-### Unweighted: Simple Counting
+Let's analyze the same question two ways and see how much weighting matters.
 
-First, let's analyze voting intentions **without** using weights (just counting people):
+**Question:** "Do you plan to vote in the upcoming election?"
+
+### Method 1: Unweighted (Just Count People)
+
+This is what you'd get if you ignored the weights—just tally up responses:
 
 ```{r unweighted-analysis}
 # Overall voting intentions, unweighted
@@ -127,12 +144,12 @@ unweighted_overall <- nonvoters_data |>
   select(response, n, percentage)
 
 kable(unweighted_overall, digits = 1,
-      caption = "Unweighted: Simply counting respondents")
+      caption = "UNWEIGHTED: Simply counting respondents")
 ```
 
-### Weighted: Accounting for Representation
+### Method 2: Weighted (Sum the Weights)
 
-Now let's use the weights (summing weights instead of counting):
+Now let's do it right—sum the weights instead of counting people:
 
 ```{r weighted-analysis}
 # Overall voting intentions, weighted
@@ -151,27 +168,31 @@ weighted_overall <- nonvoters_data |>
   select(response, weighted_n, percentage)
 
 kable(weighted_overall, digits = 1,
-      caption = "Weighted: Summing weights instead of counting")
+      caption = "WEIGHTED: Summing weights to reflect actual population")
 ```
 
-### Comparing the Results
+### The Difference
+
+Let's compare them side by side:
 
 ```{r compare-overall}
 comparison <- unweighted_overall |>
   left_join(weighted_overall, by = "response", suffix = c("_unweighted", "_weighted")) |>
-  mutate(difference = percentage_weighted - percentage_unweighted)
+  mutate(difference = percentage_weighted - percentage_unweighted) |>
+  select(response, percentage_unweighted, percentage_weighted, difference)
 
 kable(comparison, digits = 1,
-      caption = "Impact of weighting on overall results")
+      col.names = c("Response", "Unweighted %", "Weighted %", "Difference"),
+      caption = "Impact of weighting on poll results")
 ```
 
-Even small differences can matter in close races or policy decisions!
+Notice the shifts! They might seem small—2-3 percentage points—but in close elections, that's the difference between calling a race and saying it's too close to call.
 
-## Breaking Down by Voter Category
+## Breaking Down by Voter Type
 
-Let's see how weighting affects results for different types of voters:
+Let's see how weighting affects different categories of voters. Some groups might be more skewed than others.
 
-### Unweighted by Category
+### Unweighted Results by Category
 
 ```{r unweighted-by-category}
 unweighted_by_voter <- nonvoters_data |>
@@ -198,10 +219,10 @@ unweighted_summary <- unweighted_by_voter |>
   )
 
 kable(unweighted_summary, digits = 1,
-      caption = "Unweighted voting intentions by voter category")
+      caption = "UNWEIGHTED: Voting intentions by past voting behavior")
 ```
 
-### Weighted by Category
+### Weighted Results by Category
 
 ```{r weighted-by-category}
 weighted_by_voter <- nonvoters_data |>
@@ -228,10 +249,10 @@ weighted_summary <- weighted_by_voter |>
   )
 
 kable(weighted_summary, digits = 1,
-      caption = "Weighted voting intentions by voter category")
+      caption = "WEIGHTED: Voting intentions by past voting behavior")
 ```
 
-### The Difference Weighting Makes
+### Where Weighting Made the Biggest Difference
 
 ```{r category-differences}
 differences <- unweighted_summary |>
@@ -244,15 +265,18 @@ differences <- unweighted_summary |>
   select(voter_category, yes_diff, no_diff, unsure_diff)
 
 kable(differences, digits = 1,
-      caption = "Percentage point differences: Weighted - Unweighted")
+      col.names = c("Voter Category", "Yes (Δ)", "No (Δ)", "Unsure (Δ)"),
+      caption = "Percentage point differences: Weighted minus Unweighted")
 ```
 
-**Interpretation:**
-- Positive numbers: Weighted percentage is higher
-- Negative numbers: Weighted percentage is lower
-- Large differences suggest the sample was unrepresentative for that group
+**Interpreting these numbers:**
+- **Positive**: Weighted percentage is higher (group was under-represented in raw sample)
+- **Negative**: Weighted percentage is lower (group was over-represented in raw sample)
+- **Large absolute values**: Sample was very unrepresentative for this group
 
-## Visualizing the Impact of Weighting
+## Visualizing the Impact
+
+Let's see this graphically:
 
 ```{r viz-comparison, fig.width=12, fig.height=6}
 # Combine weighted and unweighted for visualization
@@ -267,12 +291,13 @@ combined <- bind_rows(
   )
 
 ggplot(combined, aes(x = voter_category, y = percentage, fill = response)) +
-  geom_col(position = "dodge") +
+  geom_col(position = "dodge", alpha = 0.8) +
   facet_wrap(~method) +
   theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(
     title = "Impact of Survey Weighting on Voting Intentions",
-    subtitle = "Notice the subtle but important shifts",
+    subtitle = "Notice the shifts—especially among infrequent voters",
     x = "Voter Category",
     y = "Percentage",
     fill = "Response"
@@ -280,108 +305,120 @@ ggplot(combined, aes(x = voter_category, y = percentage, fill = response)) +
   scale_fill_brewer(palette = "Set2")
 ```
 
+The shifts might look subtle, but they're real and consequential.
+
 ## When Weighting Matters Most
 
-Weighting has the biggest impact when:
+Weighting has the biggest effect when:
 
-1. **Sample is unrepresentative**: Certain groups are over/underrepresented
-2. **Groups differ in their responses**: Overrepresented groups have different views
-3. **Margins are close**: Even 2-3 percentage points can flip a result
-4. **Demographics matter**: Age, education, race correlate with the outcome
+**1. The sample is badly skewed**: You have too many of one demographic, too few of another
 
-Weighting has minimal impact when:
+**2. Groups differ in their views**: The over-represented group has different opinions than the under-represented group
+
+**3. Margins are close**: A 2-point shift can flip a "lead" into a "tie"
+
+**4. Demographics correlate with outcomes**: Age predicts voting behavior, education predicts policy views, etc.
+
+Weighting matters less when:
 - Sample already matches population well
-- All groups have similar views
-- Margins are very wide
+- All demographic groups have similar views
+- Margins are very wide (60-30, not 48-46)
 
-## Why Journalists Should Care
+## Evaluating Polls as a Journalist
 
-### Evaluating Polls
+When a poll lands on your desk, here's your checklist:
 
-When reading poll results, ask:
+**Ask these questions:**
 
-- **Was the data weighted?** Unweighted polls can be misleading
-- **What was weighted on?** Age? Race? Education? Past voting?
-- **How large are the weights?** Huge weights (>3.0) suggest problematic sample
-- **Is weighting methodology disclosed?** Reputable pollsters explain their methods
+✓ **Was the data weighted?** If not, be skeptical. Unweighted polls are almost never representative.
 
-### Red Flags
+✓ **What variables were used for weighting?** Age, race, education, gender, past voting? More is usually better.
 
-Watch out for:
-- **No mention of weighting**: Survey might not be representative
-- **Extreme weights**: Suggests sample is very unrepresentative
-- **Weighting on outcomes**: Adjusting based on the result itself is circular
-- **Opaque methodology**: Should clearly explain weighting procedure
+✓ **How large are the weights?** If max weight > 3.0, the sample was very unrepresentative. That's a red flag.
 
-## Reporting Weighted Data
+✓ **Is methodology disclosed?** Reputable pollsters explain their weighting in detail. Secrecy is a bad sign.
 
-### What to Include
+✓ **What was the response rate?** If only 5% of people respond, even perfect weighting can't fix a fundamentally biased sample.
 
-**Do:**
-- "Results are weighted to match population demographics"
-- "Weights account for age, gender, education, and race"
-- "After weighting, 53% support the measure (up from 51% unweighted)"
-- Include sample size: "Survey of 1,247 adults"
+**Red flags:**
 
-**Don't:**
-- Report unweighted results as if they're weighted
-- Ignore weighting information in poll documentation
-- Assume all surveys are properly weighted
-- Confuse weighting with margin of error (different concepts)
+🚩 No mention of weighting at all
 
-### Example News Excerpt
+🚩 Extreme weights (>5.0) suggest the sample is terrible
 
-> **Poll Shows Tight Race for Governor**
->
-> A new poll of 1,450 likely voters shows the gubernatorial race within the margin of error, with Candidate A at 48% and Candidate B at 46%.
->
-> The poll, conducted by Reliable Polling Inc., weighted results to match the state's demographics by age, gender, education, and 2020 voting patterns. Unweighted results showed a 3-point lead for Candidate A, but weighting to account for an overrepresentation of college graduates narrowed the gap to 2 points.
->
-> The poll has a margin of error of ±3.2 percentage points...
+🚩 Weighting on the outcome itself (circular reasoning)
 
-## Common Weighting Methods
+🚩 Vague methodology ("results were adjusted to reflect population")
 
-Different surveys use different weighting approaches:
+🚩 Online opt-in polls with no probability sample
 
-**Demographic weighting**: Match population on age, race, gender, education
-**Political weighting**: Match past election results or party registration
-**Geographic weighting**: Ensure proper regional representation
-**Propensity weighting**: Account for likelihood of response
+## How to Report Weighted Results
 
-Most reputable polls use multiple weighting variables.
+You've decided the poll is credible. How do you write about it?
 
-## Potential Problems with Weighting
+**Bad version:**
+"A new poll shows Johnson leading 54-43."
 
-Weighting can introduce issues:
+**Better version:**
+"A new poll of 1,247 likely voters shows Mayor Johnson leading challenger Smith 54% to 43%, according to results weighted to match county demographics.
 
-**Over-weighting small groups:**
-- If you have only 10 respondents from a group that should be 20%, each gets weight 2.0
-- But 10 people might not represent that group well
+The poll, conducted by Reliable Polling Inc., contacted voters via a mix of landlines and cell phones. Results were weighted to reflect the county's age, gender, education, and racial composition, as well as past voting patterns.
 
-**Hiding a bad sample:**
-- Extreme weights (>3.0) suggest fundamental sampling problems
-- Weighting can't fix a truly unrepresentative sample
+Before weighting, Johnson's lead was 5 points wider, but adjustments to account for an overrepresentation of voters over age 65 narrowed the margin. The poll has a margin of error of ±3.2 percentage points."
 
-**Model dependency:**
-- Results depend on what variables you weight on
-- Different weighting models can yield different results
+**What this includes:**
+- Sample size (1,247)
+- How they were reached (landlines + cell phones)
+- What variables were weighted (age, gender, education, race, past voting)
+- That weighting changed results (5-point shift)
+- Margin of error
 
-## Key Takeaways
+## When Weighting Goes Wrong
 
-- **Weighting adjusts samples** to match population demographics
-- **Weights show representation**: <1 overrepresented, >1 underrepresented
-- **Calculate weighted stats** by summing weights, not counting people
-- **Weighting changes results** when sample is unrepresentative
-- **Always report weighting**: Readers deserve to know
-- **Check methodology**: Reputable pollsters disclose weighting procedures
-- **Extreme weights are red flags**: Suggest sampling problems
+Weighting can fix some problems, but it has limits:
 
-## Try It Yourself
+**Problem 1: Over-reliance on small groups**
 
-1. What does a weight of 0.35 mean? What about 2.8?
+If you have only 10 respondents from a group that should be 15% of the sample, each one gets a weight around 1.5. But those 10 people might not represent their group well. You're amplifying a potentially unrepresentative subsample.
 
-2. If unweighted results show 52% support and weighted results show 49%, what does this tell you about the sample?
+**Problem 2: Hiding a fundamentally bad sample**
 
-3. Look at recent polls in the news. Do they report weighting methodology? What variables do they weight on?
+Extreme weights (>3.0) mean your sample is so skewed that weighting is duct tape on a broken machine. You can't fix a landline-only survey by giving young people 5x weights—you simply didn't reach young people.
 
-Understanding survey weighting helps you evaluate polls critically and report survey results accurately. It's one of the most important concepts for journalists covering elections, public opinion, and social trends.
+**Problem 3: Model dependency**
+
+Different weighting schemes produce different results. Weight on age and gender? One answer. Add education and race? Different answer. This is why methodology matters—it determines the outcome.
+
+## The Bottom Line
+
+Survey weighting is a necessary tool, not a suspicious trick. Every reputable poll uses it because samples are never perfect.
+
+**As a journalist, you need to:**
+- Understand why weighting exists (samples are always biased)
+- Know how to interpret weighted results (sum weights, don't count people)
+- Evaluate whether weighting was done well (check methodology)
+- Report it transparently (explain what was weighted and how)
+- Recognize its limits (can't fix a terrible sample)
+
+**Key principles:**
+- Weights < 1: Group is over-represented in sample
+- Weights > 1: Group is under-represented in sample
+- Large weights (>3): Sample quality is questionable
+- Always use weighted results when analyzing survey data
+- Always report that results are weighted
+
+## Your Turn
+
+Test your understanding:
+
+1. A survey over-samples college graduates (40% of sample, but only 30% of population). Should their weights be above or below 1.0? By approximately how much?
+
+2. You see a poll where one respondent has a weight of 8.5. What does this tell you about the sample quality?
+
+3. Find a recent poll in the news. Does it report weighting methodology? What variables does it weight on? Are there any red flags?
+
+## Looking Ahead
+
+We've covered how to make a single sample representative through weighting. But what if you want to understand how multiple factors simultaneously affect an outcome? That's where **multiple regression** comes in—our final chapter. It's regression (which we learned in Chapter 7) but with many predictors at once, letting you control for multiple confounding variables simultaneously.
+
+For now, remember: weighted surveys are good. Unweighted surveys are misleading. And surveys with terrible samples can't be saved by any amount of weighting.
