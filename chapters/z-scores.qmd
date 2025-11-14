@@ -1,33 +1,54 @@
 # Z-Scores and Identifying Outliers
 
-"Car thefts up 15% in March!" Is that a meaningful spike or normal variation? Z-scores give you a statistical way to answer this question and identify values that are genuinely unusual.
+It's Monday morning, and the police department's monthly crime report lands in your inbox. You scan through it and see: "Car thefts in March: 1,247." Last month was 1,002. That's a 24% increase!
 
-## What Is a Z-Score?
+You start writing: "Car thefts surged 24% in March, raising concerns about..." But then you pause. Is 1,247 actually unusual? You look back through the data. February was 1,002, but January was 1,180. December was 950. November was 1,210.
 
-A z-score tells you **how many standard deviations** a value is from the mean. It's a way to standardize values so you can compare apples to oranges.
+The numbers jump around every month. How do you know if March's 1,247 is genuinely alarming or just normal variation? How do you separate signal from noise?
+
+This is where z-scores come in. They give you a mathematically rigorous way to answer the question: **Is this number actually unusual?**
+
+## The Problem with Eyeballing It
+
+Humans are terrible at judging what's normal in noisy data. We see a big number and think "wow!" We see a spike and think "story!" But without statistical context, we're just guessing.
+
+Consider these scenarios:
+- March had 1,247 thefts. Is that high? Depends on the typical range.
+- June dropped to 850 thefts. Is that low? Or is crime always lower in June?
+- August hit 1,450. Panic? Or is August always busy?
+
+You can't answer these questions just by looking at the numbers. You need to quantify how unusual each value is relative to the historical pattern.
+
+## Enter the Z-Score
+
+A z-score tells you **how many standard deviations a value is from the mean**. That sounds technical, but it's simple in concept:
+
+- Most values cluster around the mean (average)
+- The standard deviation measures how spread out the values are
+- The z-score tells you: is this value close to the middle, or way out in the tails?
 
 **The formula:**
 ```
 z = (value - mean) / standard_deviation
 ```
 
-**Interpreting z-scores:**
-- **z = 0**: The value equals the mean (perfectly average)
-- **z = 1**: One standard deviation above the mean
-- **z = -1**: One standard deviation below the mean
-- **|z| > 2**: Unusual (only ~5% of values)
-- **|z| > 3**: Very unusual (only ~0.3% of values)
+**Reading z-scores:**
+- **z = 0**: Perfectly average
+- **z = 1**: One standard deviation above average (somewhat high)
+- **z = 2**: Two standard deviations above average (unusual)
+- **z = 3**: Three standard deviations above average (very unusual)
+- **z = -2**: Two standard deviations below average (unusually low)
 
-## Why Journalists Need Z-Scores
+In a normal distribution:
+- About 68% of values have z-scores between -1 and 1
+- About 95% have z-scores between -2 and 2
+- About 99.7% have z-scores between -3 and 3
 
-Z-scores help you:
+So if you find a value with |z| > 2, you've found something in the extreme 5%. If |z| > 3, you're in the extreme 0.3%. **Those are worth investigating.**
 
-- **Identify outliers**: Which months had genuinely unusual crime levels?
-- **Make comparisons**: Is a 10% increase more unusual than a 20% decrease?
-- **Avoid false alarms**: Normal variation can look dramatic without context
-- **Find stories**: Extreme outliers often have interesting explanations
+## Loading Our Data
 
-## Setting Up
+Let's work with real car theft data spanning eight years (2017-2025):
 
 ```{r setup, message=FALSE}
 library(tidyverse)
@@ -35,38 +56,42 @@ library(lubridate)
 library(knitr)
 ```
 
-## Loading Car Theft Data
-
-We'll analyze monthly car theft data from 2017 to 2025:
-
 ```{r load-data, message=FALSE}
 car_thefts <- read_csv("https://raw.githubusercontent.com/dwillis/jour405/refs/heads/main/data/car_thefts_month17_25.csv")
 
-# Look at the structure
+# What do we have?
 glimpse(car_thefts)
-head(car_thefts)
 ```
 
-## Exploring the Data
+Each row is one month. We have the total car thefts and the population for each month. Let's see the first few rows:
 
-Let's visualize the time series to see what patterns exist:
+```{r}
+head(car_thefts, 10)
+```
 
-```{r time-series, fig.width=10, fig.height=5}
+## Visualizing the Data
+
+Before calculating anything, always look at your data:
+
+```{r time-series, fig.width=10, fig.height=6}
 ggplot(car_thefts, aes(x = month, y = total)) +
-  geom_line(color = "steelblue", size = 1) +
+  geom_line(color = "steelblue", linewidth = 1) +
   geom_point(color = "steelblue", size = 2) +
   theme_minimal() +
   theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
   labs(
     title = "Monthly Car Thefts (2017-2025)",
+    subtitle = "Which months are genuinely unusual?",
     x = "Month",
     y = "Number of Car Thefts"
   )
 ```
 
-We can see variation over time, but which months are statistically unusual?
+You can see the numbers bounce around. Some months look high, some look low. But which ones are **statistically** unusual? That's what z-scores will tell us.
 
 ## Calculating Z-Scores
+
+Here's how we calculate a z-score for each month:
 
 ```{r calculate-z-scores}
 car_thefts <- car_thefts |>
@@ -76,18 +101,18 @@ car_thefts <- car_thefts |>
     z_score = (total - mean_thefts) / sd_thefts
   )
 
-# Display first few rows with z-scores
+# Look at the first few months with their z-scores
 car_thefts |>
   select(month, total, mean_thefts, sd_thefts, z_score) |>
   head(10) |>
   kable(digits = 2)
 ```
 
-Now we can see how many standard deviations each month is from the average.
+Now we can see: how many standard deviations is each month from the average? A z-score of 1.5 means "1.5 standard deviations above average"—somewhat high but not shocking. A z-score of 3.2 means "3.2 standard deviations above average"—that's genuinely extreme and demands explanation.
 
-## Identifying Unusual Months
+## Finding the Outliers
 
-Let's find months with |z-score| > 2 (statistically unusual):
+Let's identify months where |z| > 2 (in the extreme 5%):
 
 ```{r unusual-months}
 unusual_months <- car_thefts |>
@@ -96,40 +121,55 @@ unusual_months <- car_thefts |>
 
 unusual_months |>
   select(month, total, z_score) |>
-  kable(digits = 2)
+  kable(digits = 2, caption = "Months with |z-score| > 2")
 ```
 
-These are the months that stand out as statistically unusual. As a journalist, these are the months you'd want to investigate: What happened during these periods? Were there policy changes, enforcement efforts, or other events that might explain the extreme values?
+These are your story leads. Each of these months was statistically unusual. Your job as a journalist: **why?**
 
-## Visualizing Outliers
+- Did a new police chief change enforcement priorities?
+- Was there extreme weather that created opportunity for thieves?
+- Did a policy change affect how thefts were reported or categorized?
+- Was there a crime spree by an organized group?
+- Or is it just a data entry error?
 
-Let's highlight the unusual months in our time series:
+Every extreme outlier has a cause. Finding that cause is journalism.
 
-```{r viz-outliers, fig.width=10, fig.height=5}
+## Visualizing the Outliers
+
+Let's highlight these unusual months in red:
+
+```{r viz-outliers, fig.width=10, fig.height=6}
 car_thefts <- car_thefts |>
   mutate(is_outlier = abs(z_score) > 2)
 
 ggplot(car_thefts, aes(x = month, y = total, color = is_outlier)) +
-  geom_line(color = "gray80") +
+  geom_line(color = "gray70", linewidth = 0.5) +
   geom_point(size = 3) +
   scale_color_manual(
     values = c("FALSE" = "steelblue", "TRUE" = "red"),
-    labels = c("Normal", "Outlier (|z| > 2)")
+    labels = c("Normal Range", "Statistical Outlier (|z| > 2)")
   ) +
   theme_minimal() +
-  theme(axis.text.x = element_text(angle = 45, hjust = 1)) +
+  theme(
+    axis.text.x = element_text(angle = 45, hjust = 1),
+    legend.position = "bottom"
+  ) +
   labs(
-    title = "Monthly Car Thefts with Outliers Highlighted",
-    subtitle = "Red points indicate months with z-scores beyond ±2",
+    title = "Monthly Car Thefts with Statistical Outliers Highlighted",
+    subtitle = "Red points are more than 2 standard deviations from the mean",
     x = "Month",
     y = "Number of Car Thefts",
     color = NULL
   )
 ```
 
-## Accounting for Population Changes
+Now you can see patterns. Are outliers clustered in certain years? Do they come in groups (suggesting a sustained trend) or appear randomly (suggesting one-off events)?
 
-Raw theft numbers can be misleading if the population is changing. Let's calculate per-capita rates:
+## Accounting for Population Growth
+
+Wait—we've been looking at raw numbers. But what if the population is growing? A city with 100,000 people in 2017 might have 120,000 in 2024. That 20% population growth would naturally lead to more crime, even if the per-capita rate stayed constant.
+
+Let's calculate per-capita rates and their z-scores:
 
 ```{r per-capita}
 car_thefts <- car_thefts |>
@@ -147,7 +187,7 @@ car_thefts |>
   kable(digits = 2)
 ```
 
-## Finding Per-Capita Outliers
+## Per-Capita Outliers
 
 ```{r per-capita-outliers}
 unusual_per_capita <- car_thefts |>
@@ -156,55 +196,47 @@ unusual_per_capita <- car_thefts |>
 
 unusual_per_capita |>
   select(month, thefts_per_100k, z_score_per_100k) |>
-  kable(digits = 2)
+  kable(digits = 2, caption = "Months unusual by per-capita rate")
 ```
 
-## Which Months Are Unusual by Either Metric?
+Notice how the lists might differ. A month could have:
+- Normal raw count but unusual rate (population dropped)
+- Unusual raw count but normal rate (population grew)
+- Both unusual (genuine spike in crime activity)
 
-```{r combined-outliers}
-combined_outliers <- car_thefts |>
-  filter(abs(z_score) > 2 | abs(z_score_per_100k) > 2) |>
-  select(month, total, z_score, thefts_per_100k, z_score_per_100k) |>
-  arrange(month)
+This is why you calculate multiple metrics. They tell different stories.
 
-combined_outliers |>
-  kable(digits = 2)
-```
+## The Seasonal Complication
 
-This comparison can reveal interesting patterns. A month might have a normal raw number but an unusual per-capita rate (or vice versa) if the population changed significantly.
+Here's another wrinkle: many crime types follow seasonal patterns. Car thefts might be higher in summer (warm weather, more cars left unlocked) and lower in winter. If that's true, comparing March to August isn't fair—they're naturally different.
 
-## Detecting Seasonal Patterns
+Let's check if there's a seasonal pattern:
 
-Car thefts might follow seasonal patterns. Let's check:
-
-```{r seasonal-pattern, fig.width=10, fig.height=5}
+```{r seasonal-pattern, fig.width=10, fig.height=6}
 car_thefts <- car_thefts |>
   mutate(month_of_year = month(month, label = TRUE))
 
 monthly_pattern <- car_thefts |>
   group_by(month_of_year) |>
-  summarize(
-    avg_thefts = mean(total),
-    avg_per_100k = mean(thefts_per_100k)
-  )
+  summarize(avg_thefts = mean(total))
 
 ggplot(monthly_pattern, aes(x = month_of_year, y = avg_thefts, group = 1)) +
-  geom_line(color = "steelblue", size = 1.2) +
+  geom_line(color = "steelblue", linewidth = 1.2) +
   geom_point(color = "steelblue", size = 3) +
   theme_minimal() +
   labs(
-    title = "Average Car Thefts by Month",
-    subtitle = "Averaged across all years",
+    title = "Average Car Thefts by Month of Year",
+    subtitle = "Is there a seasonal pattern?",
     x = "Month",
     y = "Average Number of Thefts"
   )
 ```
 
-If there's a clear seasonal pattern, we might want to calculate z-scores that account for it.
+If you see a clear pattern (summer high, winter low, or vice versa), you should calculate **seasonal z-scores**: compare each month to other months in the same calendar month.
 
 ## Seasonal Z-Scores
 
-Instead of comparing each month to the overall average, we can compare it to the average for that particular month:
+Instead of asking "Is this March unusual compared to all months?", ask "Is this March unusual compared to other Marches?"
 
 ```{r seasonal-z-scores}
 car_thefts <- car_thefts |>
@@ -216,95 +248,100 @@ car_thefts <- car_thefts |>
   ) |>
   ungroup()
 
-# Find seasonally unusual months
+# Find months unusual for their season
 unusual_seasonal <- car_thefts |>
   filter(abs(seasonal_z_score) > 2) |>
   arrange(desc(abs(seasonal_z_score)))
 
 unusual_seasonal |>
   select(month, total, seasonal_mean, seasonal_z_score) |>
-  kable(digits = 2)
+  kable(digits = 2, caption = "Months unusual for their time of year")
 ```
 
-These are months that were unusual **for that time of year**. For example, an unusually cold July or an unusually warm January.
+These are months that broke the seasonal pattern. March 2023 might not be unusual compared to all months, but it might be way higher than typical Marches. That's a story: "What made this March different?"
 
-## Three Types of Outliers
+## Three Lenses on the Same Data
 
-We've now identified three types of unusual months:
+We've now looked at the data three ways:
 
-1. **Overall outliers** (|z_score| > 2): Unusual compared to all months
-2. **Per-capita outliers** (|z_score_per_100k| > 2): Unusual when accounting for population
-3. **Seasonal outliers** (|seasonal_z_score| > 2): Unusual for that time of year
+1. **Overall z-scores**: Is this month unusual compared to all months?
+2. **Per-capita z-scores**: Is this month unusual after adjusting for population?
+3. **Seasonal z-scores**: Is this month unusual for this time of year?
 
-```{r three-outlier-types}
+Each lens shows you something different. Each can reveal stories:
+
+```{r three-types}
 outlier_summary <- car_thefts |>
   mutate(
-    overall_outlier = abs(z_score) > 2,
-    percapita_outlier = abs(z_score_per_100k) > 2,
-    seasonal_outlier = abs(seasonal_z_score) > 2,
-    any_outlier = overall_outlier | percapita_outlier | seasonal_outlier
+    overall = abs(z_score) > 2,
+    per_capita = abs(z_score_per_100k) > 2,
+    seasonal = abs(seasonal_z_score) > 2
   ) |>
-  filter(any_outlier) |>
-  select(month, total, overall_outlier, percapita_outlier, seasonal_outlier)
+  filter(overall | per_capita | seasonal) |>
+  select(month, total, overall, per_capita, seasonal)
 
 outlier_summary |>
-  kable()
+  kable(caption = "Which months are outliers by which metric?")
 ```
 
-## Journalistic Interpretation
+A month that's an outlier by all three measures? That's a five-alarm fire. Investigate immediately.
 
-When you identify outliers with z-scores, ask:
+A month that's only a seasonal outlier? That's interesting but less urgent—something disrupted the normal seasonal pattern.
 
-### What Explains This Outlier?
+## How to Report This
 
-- **Policy changes**: New enforcement, changed laws
-- **External events**: Extreme weather, major events
-- **Data quality**: Reporting errors, definition changes
-- **Real trends**: Actual increases or decreases in crime
+You've found your outlier. Now how do you write about it?
 
-### Is This Newsworthy?
+**Bad approach:**
+"Car thefts in March were 1,247, up from 1,002 in February."
 
-- **Very extreme**: |z| > 3 is almost certainly worth investigating
-- **Moderately extreme**: |z| > 2 might be worth a mention
-- **Multiple outliers**: A cluster of unusual months suggests a trend
-- **Seasonal consideration**: Sometimes seasonal context matters more
+**Better approach:**
+"Car thefts in March reached 1,247, the highest monthly total in eight years and more than three standard deviations above the average of 892. The spike marks a significant departure from historical patterns and represents the worst month for auto theft since the city began tracking monthly data in 2017."
 
-### How to Report It
+Notice how the second version:
+- Provides historical context
+- Quantifies how unusual the number is
+- Explains what it means in plain language (no "z-scores" in the copy)
+- Gives readers a sense of scale
 
-**Instead of:** "Car thefts increased by 245 in March"
+## Common Mistakes to Avoid
 
-**Try:** "March saw 1,247 car thefts, more than 3 standard deviations above the monthly average of 892. This is the highest monthly total in the eight-year dataset and represents a statistically significant spike that warrants investigation."
+**Don't assume every outlier is a story**. Sometimes it's a data error. March's number might be high because February's thefts were accidentally counted in March. Always verify with sources before publishing.
 
-## Common Pitfalls
+**Don't ignore seasonal patterns**. Comparing December to July without accounting for seasonality can mislead readers.
 
-**Don't:**
-- Assume every outlier is newsworthy (data errors exist!)
-- Ignore seasonal patterns when they're present
-- Forget to check if population changes affect the story
-- Use z-scores with very small datasets (n < 30)
-- Report z-scores to readers (explain in plain language instead)
+**Don't forget about population changes**. A growing city will naturally have more crime even if the per-capita rate holds steady.
 
-**Do:**
-- Investigate why outliers occurred
-- Consider multiple metrics (raw, per-capita, seasonal)
-- Provide context about what's normal
-- Follow up with subject matter experts
-- Verify data quality before publishing
+**Don't use tiny datasets**. Z-scores work best with at least 30 data points. With 10 data points, one outlier can skew everything.
 
-## Key Takeaways
+**Don't report z-scores to readers**. They don't care about standard deviations. Translate the finding into plain language.
 
-- **Z-scores standardize values** to show how unusual they are
-- **|z| > 2 is unusual**, |z| > 3 is very unusual
-- **Consider multiple perspectives**: raw numbers, per-capita, seasonal
-- **Outliers often have stories**: Something interesting usually explains them
-- **Always verify**: Data errors can look like outliers
+## The Power of Z-Scores
 
-## Try It Yourself
+Z-scores do three crucial things for journalists:
 
-1. Find the month with the highest positive z-score. What was happening during that time?
+1. **They separate signal from noise**. Not every uptick is a story. Z-scores tell you which ones actually matter.
 
-2. Calculate how many months have |z_score| > 1.5. Is this roughly what you'd expect based on the normal distribution?
+2. **They let you compare incomparable things**. Is a 20% increase in February more or less unusual than a 10% increase in August? Z-scores tell you.
 
-3. Create a visualization showing seasonal z-scores over time. Are there any clear patterns?
+3. **They identify stories**. Extreme outliers always have causes. Finding outliers means finding stories.
 
-Z-scores are one of the most practical tools in a data journalist's toolkit. They help you separate signal from noise and identify the data points that deserve deeper investigation.
+## Your Assignment
+
+Now it's your turn. Using the car theft data:
+
+1. Find the month with the highest positive z-score. Look up what was happening in that city during that time. Can you find a news story explaining the spike?
+
+2. Find the month with the most negative z-score (biggest drop). What changed?
+
+3. Pick one seasonal outlier. Why was that particular March (or July, or December) so different from other Marches?
+
+These aren't academic exercises. This is the work you'll do as a data journalist every single day: finding the numbers that don't fit the pattern, then figuring out why.
+
+## The Bottom Line
+
+Z-scores are your BS detector. They tell you when something genuinely unusual is happening versus when it's just normal variation. They save you from writing false alarm stories, and they help you spot real stories that less sophisticated reporters miss.
+
+Master z-scores, and you'll never again mistake noise for signal. You'll find stories others overlook. And you'll report with confidence, backed by mathematics.
+
+Now let's move on to understanding relationships between variables—because often the most interesting stories aren't about outliers, but about how things connect to each other.
