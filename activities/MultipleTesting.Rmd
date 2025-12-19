@@ -1,0 +1,492 @@
+---
+title: "The Multiple Testing Problem: Why Testing Many Things Guarantees False Positives"
+author: "Your Name"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Introduction
+
+A researcher tests whether eating blueberries, strawberries, raspberries, blackberries, cherries, grapes, apples, oranges, bananas, kiwis, peaches, plums, apricots, pears, and watermelon affects blood pressure. One shows a "statistically significant" effect (p < 0.05): bananas!
+
+**Headline:** "Study Proves Bananas Lower Blood Pressure"
+
+But here's the problem: when you test 15 things, you'd expect to find one "significant" result purely by chance—even if none of them actually work. This is the multiple testing problem, and journalists need to recognize it.
+
+## The Core Problem: What p < 0.05 Really Means
+
+Remember: p < 0.05 means there's a 5% chance you'd see this result if there's actually no real effect.
+
+**Think of it as a false alarm rate:** Out of 100 tests where nothing real is happening, about 5 will still show "significant" results just by random chance.
+
+```{r}
+# Let's demonstrate this with a simulation
+set.seed(123)
+
+# Test 100 completely random relationships
+n_tests <- 100
+p_values <- numeric(n_tests)
+
+for(i in 1:n_tests) {
+  # Generate random data with NO real relationship
+  x <- rnorm(50)
+  y <- rnorm(50)  # Completely independent of x
+
+  # Test for correlation
+  test_result <- cor.test(x, y)
+  p_values[i] <- test_result$p.value
+}
+
+# How many are "significant"?
+significant_count <- sum(p_values < 0.05)
+
+cat("Out of", n_tests, "tests where there's NO real relationship:\n")
+cat("Number with p < 0.05:", significant_count, "\n")
+cat("Expected by chance: ~5\n")
+```
+
+### Reflection Question 1:
+Run the code block above multiple times (click the green arrow repeatedly). Does the number of "significant" results change? Is it always close to 5?
+
+PUT ANSWER HERE
+
+## Task 1: Visualizing False Positives
+
+Let's see what happens when a researcher tests many variables.
+
+```{r}
+# Simulate a researcher testing 20 foods for blood pressure effects
+set.seed(456)
+
+foods <- c("Blueberries", "Strawberries", "Raspberries", "Blackberries",
+           "Cherries", "Grapes", "Apples", "Oranges", "Bananas",
+           "Kiwis", "Peaches", "Plums", "Apricots", "Pears",
+           "Watermelon", "Mangoes", "Pineapple", "Papaya",
+           "Cantaloupe", "Honeydew")
+
+# Test each food (all random data - no real effects!)
+food_results <- tibble(
+  food = foods,
+  p_value = replicate(20, {
+    control <- rnorm(30, mean = 120, sd = 15)
+    treatment <- rnorm(30, mean = 120, sd = 15)
+    t.test(treatment, control)$p.value
+  }),
+  significant = p_value < 0.05
+)
+
+# Sort by p-value
+food_results <- food_results |>
+  arrange(p_value)
+
+# Visualize
+ggplot(food_results, aes(x = reorder(food, -p_value), y = p_value,
+                         fill = significant)) +
+  geom_col() +
+  geom_hline(yintercept = 0.05, linetype = "dashed",
+             color = "red", size = 1.5) +
+  annotate("text", x = 3, y = 0.08, label = "Significance threshold",
+           color = "red", fontface = "bold") +
+  scale_fill_manual(values = c("FALSE" = "gray70", "TRUE" = "darkgreen")) +
+  labs(
+    title = "Testing 20 Foods for Blood Pressure Effects",
+    subtitle = "All data is random - no real effects exist!",
+    x = "Food",
+    y = "p-value",
+    fill = "Significant?"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "bottom")
+
+# Show "significant" results
+significant_foods <- food_results |>
+  filter(significant)
+
+cat("\n'Significant' findings (p < 0.05):\n")
+print(significant_foods)
+```
+
+### Reflection Question 2:
+- How many foods showed "significant" results?
+- Remember: We generated all this data randomly. Are any of these findings real?
+- If a journalist only reported the "significant" findings, what would be wrong with their story?
+
+PUT ANSWER HERE
+
+## Task 2: The Jelly Bean Problem
+
+This famous XKCD comic illustrates the multiple testing problem perfectly:
+
+**Scenario:**
+- Scientists test whether jelly beans cause acne
+- First test (all jelly beans): No significant effect
+- Then test 20 different colors separately
+- One color (green!) shows p < 0.05
+
+Let's simulate this:
+
+```{r}
+# Test all jelly beans together
+set.seed(789)
+jelly_bean_test <- tibble(
+  group = rep(c("Control", "Jelly Beans"), each = 100),
+  acne_score = rnorm(200, mean = 50, sd = 10)
+)
+
+overall_test <- t.test(acne_score ~ group, data = jelly_bean_test)
+
+cat("Overall test - All jelly beans combined:\n")
+cat("p-value:", round(overall_test$p.value, 3), "\n")
+cat("Significant?", overall_test$p.value < 0.05, "\n\n")
+
+# Now test 20 colors separately
+colors <- c("Red", "Orange", "Yellow", "Green", "Blue", "Purple",
+            "Pink", "Brown", "Black", "White", "Gray", "Cyan",
+            "Magenta", "Lime", "Navy", "Maroon", "Olive", "Teal",
+            "Silver", "Gold")
+
+color_results <- tibble(
+  color = colors,
+  p_value = replicate(20, {
+    control <- rnorm(30, mean = 50, sd = 10)
+    color_group <- rnorm(30, mean = 50, sd = 10)
+    t.test(color_group, control)$p.value
+  })
+) |>
+  mutate(significant = p_value < 0.05)
+
+# Find significant colors
+significant_colors <- color_results |>
+  filter(significant) |>
+  arrange(p_value)
+
+cat("Testing each color separately:\n")
+print(significant_colors)
+
+# Visualize
+ggplot(color_results, aes(x = reorder(color, p_value), y = p_value)) +
+  geom_point(aes(color = significant, size = significant)) +
+  geom_hline(yintercept = 0.05, linetype = "dashed", color = "red") +
+  scale_color_manual(values = c("FALSE" = "gray", "TRUE" = "darkred")) +
+  scale_size_manual(values = c("FALSE" = 2, "TRUE" = 4)) +
+  labs(
+    title = "Testing 20 Jelly Bean Colors Separately",
+    subtitle = "About 1 in 20 will be 'significant' by chance",
+    x = "Jelly Bean Color",
+    y = "p-value"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1),
+        legend.position = "none")
+```
+
+### Reflection Question 3:
+- The overall test found no effect. Then testing colors separately found one "significant" color. Which result should you trust?
+- Why is testing 20 colors a problem?
+- How might a press release from the research lab mislead journalists?
+
+PUT ANSWER HERE
+
+## Task 3: The Researcher's Advantage
+
+Researchers know about this problem, but bad actors can exploit it. Here's how:
+
+### Strategy 1: Test everything, report what's significant
+
+```{r}
+# A researcher collects lots of variables
+set.seed(321)
+
+# Outcome: Student test scores
+test_scores <- rnorm(100, mean = 75, sd = 10)
+
+# Potential predictors (all random, no real relationships)
+predictors <- tibble(
+  test_score = test_scores,
+  hours_studied = rnorm(100, 5, 2),
+  sleep_hours = rnorm(100, 7, 1),
+  breakfast_rating = sample(1:5, 100, replace = TRUE),
+  exercise_minutes = rnorm(100, 30, 15),
+  screen_time = rnorm(100, 180, 60),
+  books_owned = rpois(100, 20),
+  pets = rpois(100, 1),
+  siblings = rpois(100, 2),
+  commute_time = rnorm(100, 25, 10),
+  room_temperature = rnorm(100, 68, 3)
+)
+
+# Test each predictor
+predictor_names <- c("hours_studied", "sleep_hours", "breakfast_rating",
+                     "exercise_minutes", "screen_time", "books_owned",
+                     "pets", "siblings", "commute_time", "room_temperature")
+
+test_results <- tibble(
+  predictor = predictor_names,
+  p_value = sapply(predictor_names, function(var) {
+    cor.test(predictors$test_score, predictors[[var]])$p.value
+  }),
+  correlation = sapply(predictor_names, function(var) {
+    cor(predictors$test_score, predictors[[var]])
+  })
+) |>
+  mutate(significant = p_value < 0.05) |>
+  arrange(p_value)
+
+test_results
+
+cat("\nSignificant findings:\n")
+print(filter(test_results, significant))
+```
+
+**The misleading press release:** "New Study: Room Temperature Linked to Student Performance!"
+
+### Reflection Question 4:
+- How many tests did the researcher run?
+- How many would you expect to be "significant" by chance?
+- If you only saw the press release about room temperature, what would you not know?
+
+PUT ANSWER HERE
+
+## Task 4: Corrections for Multiple Testing
+
+Scientists use corrections to account for multiple testing. The simplest is the **Bonferroni correction**:
+
+**Adjusted significance level = 0.05 / number of tests**
+
+If you test 10 things, only call it significant if p < 0.005 (not 0.05).
+
+Let's apply this to our earlier food example:
+
+```{r}
+# Original results
+cat("Original threshold: p < 0.05\n")
+cat("Number of 'significant' results:", sum(food_results$significant), "\n\n")
+
+# Bonferroni correction
+n_tests <- nrow(food_results)
+bonferroni_threshold <- 0.05 / n_tests
+
+cat("Bonferroni corrected threshold: p <", round(bonferroni_threshold, 4), "\n")
+cat("Number significant after correction:",
+    sum(food_results$p_value < bonferroni_threshold), "\n")
+
+# Visualize
+food_results |>
+  mutate(
+    significant_uncorrected = p_value < 0.05,
+    significant_corrected = p_value < bonferroni_threshold
+  ) |>
+  ggplot(aes(x = reorder(food, p_value), y = p_value)) +
+  geom_point(aes(color = significant_uncorrected), size = 3) +
+  geom_hline(yintercept = 0.05, linetype = "dashed",
+             color = "orange", size = 1) +
+  geom_hline(yintercept = bonferroni_threshold, linetype = "dashed",
+             color = "red", size = 1) +
+  annotate("text", x = 15, y = 0.07, label = "Original threshold",
+           color = "orange") +
+  annotate("text", x = 15, y = 0.01, label = "Bonferroni threshold",
+           color = "red") +
+  scale_color_manual(values = c("FALSE" = "gray", "TRUE" = "darkgreen")) +
+  labs(
+    title = "Effect of Bonferroni Correction",
+    x = "Food",
+    y = "p-value",
+    color = "Significant\n(uncorrected)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Reflection Question 5:
+- After Bonferroni correction, how many results remain "significant"?
+- Why is this correction necessary?
+- If a study doesn't mention using corrections, what should you suspect?
+
+PUT ANSWER HERE
+
+## Task 5: Red Flags in Research Papers
+
+As a journalist, watch for these warning signs:
+
+```{r}
+red_flags <- tibble(
+  red_flag = c(
+    "Tests many variables, reports only significant ones",
+    "No mention of multiple testing corrections",
+    "Subgroup analysis not planned in advance",
+    "p-value just barely below 0.05 (like 0.048)",
+    "Changed analysis methods after seeing data",
+    "Study tested multiple outcomes, reports one"
+  ),
+
+  why_problematic = c(
+    "Cherry-picking results",
+    "Inflates false positive rate",
+    "Data dredging for patterns",
+    "Likely found by testing many things",
+    "Called 'p-hacking' or 'HARKing'",
+    "Outcome switching"
+  ),
+
+  what_to_ask = c(
+    "How many variables did you test?",
+    "Did you use Bonferroni or other corrections?",
+    "Was this subgroup pre-specified?",
+    "How many tests did you run before finding this?",
+    "Was this your original hypothesis?",
+    "What were the other outcomes you measured?"
+  )
+)
+
+red_flags
+```
+
+## Task 6: Real Example - Gender and Career Choice
+
+A researcher examines whether gender predicts career choice across 30 different careers. Let's see what happens:
+
+```{r}
+set.seed(111)
+
+careers <- c("Engineer", "Nurse", "Teacher", "Lawyer", "Doctor", "Chef",
+             "Accountant", "Designer", "Programmer", "Writer", "Scientist",
+             "Artist", "Manager", "Sales", "HR", "Marketing", "Analyst",
+             "Consultant", "Therapist", "Pharmacist", "Dentist", "Pilot",
+             "Mechanic", "Electrician", "Plumber", "Architect", "Editor",
+             "Translator", "Librarian", "Social Worker")
+
+# Test gender differences for each career (all random data)
+career_results <- tibble(
+  career = careers,
+  pct_women_sample = rnorm(30, 50, 15),  # Random percentages
+  p_value = replicate(30, {
+    # Simulate testing if this differs from 50%
+    sample <- sample(c(0, 1), 100, replace = TRUE, prob = c(0.5, 0.5))
+    binom.test(sum(sample), length(sample), p = 0.5)$p.value
+  })
+) |>
+  mutate(
+    significant = p_value < 0.05,
+    bonferroni_sig = p_value < (0.05 / 30)
+  ) |>
+  arrange(p_value)
+
+cat("Without correction:\n")
+cat("'Significant' gender differences:", sum(career_results$significant), "careers\n\n")
+
+cat("With Bonferroni correction:\n")
+cat("Significant gender differences:", sum(career_results$bonferroni_sig), "careers\n")
+
+# Show the ones that would be reported
+career_results |>
+  filter(significant) |>
+  select(career, p_value, significant, bonferroni_sig) |>
+  print()
+```
+
+### Reflection Question 6:
+- How many careers showed "significant" gender differences without correction?
+- How many remained significant after Bonferroni correction?
+- If a press release said "Study Finds Gender Bias in Engineering," what would you want to know?
+
+PUT ANSWER HERE
+
+## Task 7: Writing Guidelines
+
+Here's how to report studies that test multiple things:
+
+### ❌ Bad: "Study Shows Vitamin D Improves Memory"
+(Researchers tested 15 different vitamins, 12 cognitive functions = 180 tests total)
+
+### ✅ Good: "Study examined 15 vitamins across 12 cognitive functions. One combination—Vitamin D and memory—showed a statistically significant association (p = 0.03), but researchers did not correct for multiple testing. Given 180 comparisons, about 9 significant results would be expected by chance."
+
+### Your Turn:
+
+A study tested whether 25 different foods affect risk of 8 different cancers (200 tests total). They found that eating pickles was associated with lower pancreatic cancer risk (p = 0.04).
+
+Write a responsible news paragraph:
+
+PUT ANSWER HERE
+
+## Task 8: The False Discovery Rate
+
+Here's a sobering calculation. If you test 100 things where only 10 real effects exist:
+
+```{r}
+# Simulation parameters
+n_tests <- 100
+n_real_effects <- 10
+n_null <- 90
+
+# Outcomes at p < 0.05
+true_positives <- n_real_effects * 0.80  # 80% power to detect real effects
+false_positives <- n_null * 0.05  # 5% of nulls
+
+total_significant <- true_positives + false_positives
+false_discovery_rate <- false_positives / total_significant
+
+results_summary <- tibble(
+  category = c("True positives (real effects found)",
+               "False positives (noise)",
+               "Total 'significant' findings",
+               "False discovery rate"),
+  value = c(true_positives, false_positives,
+            total_significant, false_discovery_rate)
+)
+
+results_summary
+
+cat("\nOf your 'significant' findings, ",
+    round(false_discovery_rate * 100, 1),
+    "% are false positives!\n", sep = "")
+```
+
+### Reflection Question 7:
+This shows that even when real effects exist, many "discoveries" are false when you test many things. Why does this matter for science journalism?
+
+PUT ANSWER HERE
+
+## Key Takeaways
+
+1. **p < 0.05 means 5% false positive rate**: Test 20 things, expect 1 false positive
+
+2. **Multiple testing inflates error rate**: Test 100 things, expect ~5 false positives
+
+3. **Corrections are necessary**: Bonferroni and others adjust thresholds
+
+4. **Publication bias**: Journals publish positive findings, not negative ones
+
+5. **Questions to ask**:
+   - How many things did you test?
+   - Did you use multiple testing corrections?
+   - Was this hypothesis specified before seeing the data?
+
+6. **Red flags**:
+   - Testing many variables, reporting only significant ones
+   - p-values barely below 0.05
+   - No mention of corrections
+   - Subgroup analyses not pre-planned
+
+7. **Write cautiously**: When studies test many things, mention this context
+
+## Final Reflection
+
+### Reflection Question 8:
+Find a news article about a scientific study. See if you can determine:
+- How many variables/relationships did the study test?
+- Does the article mention this?
+- Does the study mention using corrections for multiple testing?
+- If they tested many things but only reported significant ones, how should the article change?
+
+PUT ANSWER HERE
+
+### Reflection Question 9:
+Why might researchers be incentivized to test many things and report only significant findings? What role do journals, media, and funding play in this problem?
+
+PUT ANSWER HERE
+
+When finished, save your work, switch to GitHub Desktop, then add, commit and push your changes to GitHub and submit the URL of the notebook in ELMS.

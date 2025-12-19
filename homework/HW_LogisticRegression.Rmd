@@ -1,0 +1,454 @@
+---
+title: "Logistic Regression: Predicting Binary Outcomes"
+name: "YOUR NAME HERE"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+# Introduction
+
+You've learned linear regression to predict continuous outcomes (test scores, voter turnout percentages, housing prices). But many journalism questions involve binary outcomes:
+
+- **Did the school meet state standards?** (Yes/No)
+- **Did the business pass inspection?** (Yes/No)
+- **Did the defendant get convicted?** (Yes/No)
+- **Did the team win the game?** (Yes/No)
+
+Logistic regression is the tool for predicting and understanding binary outcomes. Instead of predicting the outcome directly, it predicts the **probability** of the outcome occurring.
+
+## Load the Data
+
+This dataset contains information about Maryland public high schools and whether they met state performance standards in 2023-24.
+
+```{r}
+# Load school performance data
+schools <- read_csv("https://raw.githubusercontent.com/dwillis/jour405/refs/heads/main/data/md_school_performance.csv")
+
+glimpse(schools)
+```
+
+## Understanding the Data
+
+Each row is a high school. Variables include:
+
+- **meets_standards**: Did the school meet state standards? (1 = Yes, 0 = No)
+- **pct_low_income**: Percentage of students from low-income families
+- **avg_class_size**: Average class size
+- **per_pupil_spending**: Spending per student (dollars)
+- **teacher_experience**: Average years of teacher experience
+- **attendance_rate**: Percentage of students with good attendance
+- **enrollment**: Total number of students
+
+Our question: **What factors predict whether a school will meet standards?**
+
+## Task 1: Exploratory Analysis (3 points)
+
+Before building models, let's explore the relationship between variables and meeting standards.
+
+```{r}
+# Summary by standards status
+summary_by_standards <- schools |>
+  group_by(meets_standards) |>
+  summarise(
+    n_schools = n(),
+    avg_pct_low_income = mean(pct_low_income),
+    avg_class_size = mean(avg_class_size),
+    avg_spending = mean(per_pupil_spending),
+    avg_teacher_exp = mean(teacher_experience),
+    avg_attendance = mean(attendance_rate)
+  )
+
+summary_by_standards
+
+# Visualize key differences
+schools |>
+  pivot_longer(cols = c(pct_low_income, avg_class_size, per_pupil_spending,
+                       teacher_experience, attendance_rate),
+               names_to = "variable",
+               values_to = "value") |>
+  ggplot(aes(x = factor(meets_standards), y = value, fill = factor(meets_standards))) +
+  geom_boxplot() +
+  facet_wrap(~ variable, scales = "free_y") +
+  scale_fill_manual(values = c("0" = "coral", "1" = "lightblue"),
+                    labels = c("Did Not Meet", "Met Standards")) +
+  labs(
+    title = "School Characteristics by Standards Status",
+    x = "Meets Standards",
+    fill = NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+### Reflection Question 1:
+Looking at the summary statistics and boxplots:
+- Which variables show the biggest differences between schools that met vs. didn't meet standards?
+- Which variable do you think will be the strongest predictor?
+- Are there any surprises?
+
+PUT ANSWER HERE
+
+## Task 2: Building Your First Logistic Regression Model (5 points)
+
+Linear regression predicts: **Outcome = β₀ + β₁X₁ + β₂X₂ + ...**
+
+Logistic regression predicts: **log(odds) = β₀ + β₁X₁ + β₂X₂ + ...**
+
+Then converts to: **Probability = e^(log(odds)) / (1 + e^(log(odds)))**
+
+Don't worry about the math—R handles it. Focus on interpretation.
+
+```{r}
+# Build a simple model with one predictor
+simple_model <- glm(meets_standards ~ pct_low_income,
+                    data = schools,
+                    family = "binomial")  # This makes it logistic regression
+
+summary(simple_model)
+```
+
+### Understanding the Output
+
+**Coefficients:**
+- **(Intercept)**: Log-odds when predictor = 0
+- **pct_low_income**: How log-odds change for each 1-unit increase
+
+**Key question**: Is the coefficient significant (p < 0.05)?
+
+### Reflection Question 2:
+- Is pct_low_income a significant predictor?
+- Is the coefficient positive or negative?
+- In plain English: As the percentage of low-income students increases, does the probability of meeting standards go up or down?
+
+PUT ANSWER HERE
+
+## Task 3: Converting to Probabilities (4 points)
+
+Log-odds are hard to interpret. Let's convert to probabilities.
+
+```{r}
+# Create predictions for different low-income percentages
+low_income_range <- tibble(
+  pct_low_income = seq(0, 100, by = 10)
+)
+
+# Predict probabilities
+low_income_range$predicted_prob <- predict(simple_model,
+                                           newdata = low_income_range,
+                                           type = "response")
+
+low_income_range
+
+# Visualize
+ggplot(low_income_range, aes(x = pct_low_income, y = predicted_prob)) +
+  geom_line(color = "darkblue", size = 1.5) +
+  geom_point(size = 3) +
+  geom_hline(yintercept = 0.5, linetype = "dashed", color = "red") +
+  annotate("text", x = 80, y = 0.55, label = "50% threshold",
+           color = "red") +
+  labs(
+    title = "Predicted Probability of Meeting Standards",
+    subtitle = "Based on percentage of low-income students",
+    x = "Percentage Low-Income Students",
+    y = "Probability of Meeting Standards"
+  ) +
+  scale_y_continuous(labels = scales::percent_format(scale = 1)) +
+  theme_minimal()
+```
+
+### Reflection Question 3:
+- At 20% low-income students, what's the predicted probability of meeting standards?
+- At 80% low-income students, what's the predicted probability?
+- At what percentage of low-income students does the probability drop below 50%?
+
+PUT ANSWER HERE
+
+## Task 4: Multiple Predictors (5 points)
+
+Now let's build a model with multiple predictors, like multiple linear regression.
+
+```{r}
+# Full model
+full_model <- glm(meets_standards ~ pct_low_income + avg_class_size +
+                   per_pupil_spending + teacher_experience + attendance_rate,
+                 data = schools,
+                 family = "binomial")
+
+summary(full_model)
+```
+
+### Reflection Question 4:
+- Which variables are statistically significant (p < 0.05)?
+- Which variable has the largest coefficient (in absolute value)?
+- Are any coefficients surprising (sign not what you expected)?
+
+PUT ANSWER HERE
+
+## Task 5: Comparing Models (4 points)
+
+Like with linear regression, we can compare models. For logistic regression, we use **AIC** (Akaike Information Criterion) instead of R-squared. **Lower AIC = better model**.
+
+```{r}
+# Build alternative models
+model2 <- glm(meets_standards ~ pct_low_income + attendance_rate,
+             data = schools, family = "binomial")
+
+model3 <- glm(meets_standards ~ pct_low_income + attendance_rate + teacher_experience,
+             data = schools, family = "binomial")
+
+model4 <- glm(meets_standards ~ REPLACE_ME,  # Create your own model
+             data = schools, family = "binomial")
+
+# Compare AICs
+model_comparison <- tibble(
+  model = c("Simple (low income only)",
+            "Full model (all variables)",
+            "Model 2 (low income + attendance)",
+            "Model 3 (low income + attendance + experience)",
+            "Model 4 (your model)"),
+  AIC = c(AIC(simple_model),
+          AIC(full_model),
+          AIC(model2),
+          AIC(model3),
+          AIC(model4)),
+  n_predictors = c(1, 5, 2, 3, NA)  # Fill in for model 4
+) |>
+  arrange(AIC)
+
+model_comparison
+
+# Visualize
+ggplot(model_comparison, aes(x = reorder(model, AIC), y = AIC)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = round(AIC, 1)), hjust = -0.1) +
+  coord_flip() +
+  labs(
+    title = "Model Comparison by AIC",
+    subtitle = "Lower AIC = Better Model",
+    x = NULL,
+    y = "AIC (Lower is Better)"
+  ) +
+  theme_minimal()
+```
+
+### Reflection Question 5:
+- Which model has the lowest AIC?
+- Does the full model with all variables perform best, or is a simpler model better?
+- Explain your model 4: What variables did you include and why?
+
+PUT ANSWER HERE
+
+## Task 6: Predictions for Specific Schools (4 points)
+
+Let's use the best model to predict outcomes for specific scenarios.
+
+```{r}
+# Choose your best model (replace 'full_model' if needed)
+best_model <- full_model
+
+# Scenario A: High-income area school
+school_a <- tibble(
+  pct_low_income = 15,
+  avg_class_size = 22,
+  per_pupil_spending = 18000,
+  teacher_experience = 12,
+  attendance_rate = 95
+)
+
+# Scenario B: High-poverty school with interventions
+school_b <- tibble(
+  pct_low_income = 75,
+  avg_class_size = 18,  # Small classes
+  per_pupil_spending = 20000,  # High spending
+  teacher_experience = 10,
+  attendance_rate = 88
+)
+
+# Scenario C: High-poverty school without interventions
+school_c <- tibble(
+  pct_low_income = 75,
+  avg_class_size = 28,  # Large classes
+  per_pupil_spending = 14000,  # Low spending
+  teacher_experience = 8,
+  attendance_rate = 85
+)
+
+# Predict probabilities
+scenarios <- bind_rows(
+  school_a |> mutate(scenario = "A: Affluent school"),
+  school_b |> mutate(scenario = "B: High-poverty + interventions"),
+  school_c |> mutate(scenario = "C: High-poverty, no interventions")
+)
+
+scenarios$predicted_prob <- predict(best_model,
+                                   newdata = scenarios,
+                                   type = "response") * 100
+
+scenarios |>
+  select(scenario, pct_low_income, per_pupil_spending, avg_class_size,
+         predicted_prob) |>
+  mutate(predicted_prob = round(predicted_prob, 1))
+
+# Visualize
+ggplot(scenarios, aes(x = scenario, y = predicted_prob, fill = scenario)) +
+  geom_col() +
+  geom_text(aes(label = paste0(round(predicted_prob, 1), "%")),
+            vjust = -0.5, fontface = "bold") +
+  geom_hline(yintercept = 50, linetype = "dashed", color = "red") +
+  labs(
+    title = "Predicted Probability of Meeting Standards",
+    subtitle = "Three different school scenarios",
+    x = NULL,
+    y = "Probability (%)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+### Reflection Question 6:
+- Which school has the highest probability of meeting standards?
+- Compare School B and School C. Both serve 75% low-income students. What's the predicted probability difference?
+- Based on this, what story would you write about interventions in high-poverty schools?
+
+PUT ANSWER HERE
+
+## Task 7: Model Accuracy (3 points)
+
+How well does our model actually perform? Let's check.
+
+```{r}
+# Add predictions to original data
+schools$predicted_prob <- predict(best_model, type = "response")
+schools$predicted_outcome <- if_else(schools$predicted_prob > 0.5, 1, 0)
+
+# Create confusion matrix
+confusion_matrix <- schools |>
+  count(meets_standards, predicted_outcome) |>
+  pivot_wider(names_from = predicted_outcome,
+              values_from = n,
+              names_prefix = "Predicted_") |>
+  rename(Actual = meets_standards)
+
+confusion_matrix
+
+# Calculate accuracy metrics
+total_schools <- nrow(schools)
+correct_predictions <- sum(schools$meets_standards == schools$predicted_outcome)
+accuracy <- correct_predictions / total_schools
+
+# True positives, false positives, etc.
+true_positives <- sum(schools$meets_standards == 1 & schools$predicted_outcome == 1)
+false_positives <- sum(schools$meets_standards == 0 & schools$predicted_outcome == 1)
+true_negatives <- sum(schools$meets_standards == 0 & schools$predicted_outcome == 0)
+false_negatives <- sum(schools$meets_standards == 1 & schools$predicted_outcome == 0)
+
+cat("Overall accuracy:", round(accuracy * 100, 1), "%\n")
+cat("True Positives (correctly predicted met standards):", true_positives, "\n")
+cat("False Positives (predicted met, but didn't):", false_positives, "\n")
+cat("True Negatives (correctly predicted didn't meet):", true_negatives, "\n")
+cat("False Negatives (predicted didn't meet, but did):", false_negatives, "\n")
+```
+
+### Reflection Question 7:
+- What percentage of schools did the model correctly classify?
+- Which error is worse for education policy: false positives or false negatives? Why?
+- Is this accuracy good enough to use for decision-making? What would you need to feel confident?
+
+PUT ANSWER HERE
+
+## Task 8: Odds Ratios (Bonus: 2 points)
+
+The coefficients in logistic regression are log-odds. We can convert them to **odds ratios**, which are easier to interpret.
+
+**Odds ratio = e^(coefficient)**
+
+- Odds ratio > 1: Variable increases probability
+- Odds ratio < 1: Variable decreases probability
+- Odds ratio = 1: Variable has no effect
+
+```{r}
+# Extract coefficients and convert to odds ratios
+coefficients <- coef(best_model)
+odds_ratios <- exp(coefficients)
+
+# Create interpretation table
+interpretation <- tibble(
+  variable = names(coefficients),
+  coefficient = coefficients,
+  odds_ratio = odds_ratios,
+  interpretation = case_when(
+    variable == "(Intercept)" ~ "Baseline odds",
+    odds_ratios > 1 ~ paste0("Increases odds by ", round((odds_ratios - 1) * 100, 1), "%"),
+    odds_ratios < 1 ~ paste0("Decreases odds by ", round((1 - odds_ratios) * 100, 1), "%"),
+    TRUE ~ "No effect"
+  )
+)
+
+interpretation
+```
+
+### Bonus Reflection:
+Interpret the odds ratio for attendance_rate in plain English. What does it mean for a school's chances of meeting standards?
+
+PUT ANSWER HERE
+
+## Task 9: Writing the Story (5 points)
+
+Using your analysis, write a news story about what factors predict whether Maryland schools meet state standards.
+
+Your story should:
+1. Include specific probabilities from your models
+2. Compare different school scenarios
+3. Avoid statistical jargon (don't say "logistic regression," "coefficients," etc.)
+4. Explain what policy makers or parents should know
+5. Note any limitations or caveats
+
+**Your news story (3-4 paragraphs):**
+
+PUT ANSWER HERE
+
+## Key Takeaways
+
+1. **Logistic regression for binary outcomes**: Yes/No, Pass/Fail, Win/Lose
+
+2. **Predicts probabilities**: Between 0% and 100%, not the outcome directly
+
+3. **Interpretation**:
+   - Positive coefficient = increases probability
+   - Negative coefficient = decreases probability
+   - Significance (p < 0.05) = matters
+
+4. **Model comparison**: Use AIC (lower is better)
+
+5. **Accuracy matters**: Check how well your model actually predicts
+
+6. **Story writing**: Focus on probabilities and real-world scenarios, not statistics
+
+## Common Journalism Applications
+
+- **School performance**: Will a school meet standards?
+- **Business inspections**: Will a restaurant pass inspection?
+- **Criminal justice**: What predicts conviction vs. acquittal?
+- **Elections**: What factors predict whether a candidate wins?
+- **Public health**: What predicts disease occurrence?
+- **Sports**: What factors predict whether a team wins?
+
+## Final Reflection
+
+### Reflection Question 8:
+How is logistic regression different from linear regression? When would you use each?
+
+PUT ANSWER HERE
+
+### Reflection Question 9:
+Think of a journalism story you could investigate using logistic regression. What would be:
+- Your binary outcome (what are you trying to predict)?
+- Your predictor variables?
+- Why would this story matter to readers?
+
+PUT ANSWER HERE
+
+When finished, save your work, switch to GitHub Desktop, then add, commit and push your changes to GitHub and submit the URL of the notebook in ELMS.

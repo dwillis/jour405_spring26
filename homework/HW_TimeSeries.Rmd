@@ -1,0 +1,528 @@
+---
+title: "Time Series Analysis: Trends, Seasonality, and Patterns Over Time"
+name: "YOUR NAME HERE"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+library(lubridate)
+```
+
+# Introduction
+
+As a journalist, you'll constantly analyze data that changes over time:
+- Crime rates by month
+- Economic indicators
+- Election polling trends
+- Public health statistics
+- School enrollment patterns
+
+But time adds complexity. Is that increase a real trend, or just normal seasonal variation? Is December's spike meaningful, or does it happen every year?
+
+This homework teaches you to:
+- Identify and visualize trends over time
+- Detect seasonal patterns
+- Distinguish real changes from normal variation
+- Write accurately about time-based data
+
+## Load the Data
+
+We'll analyze three years of monthly crime data from a city police department.
+
+```{r}
+# Load crime data
+crime_data <- read_csv("https://raw.githubusercontent.com/dwillis/jour405/refs/heads/main/data/monthly_crime_data.csv")
+
+# Convert month to date format
+crime_data <- crime_data |>
+  mutate(date = ym(month))  # Convert "2022-01" to date
+
+glimpse(crime_data)
+```
+
+## Task 1: Visualizing the Raw Data (3 points)
+
+Start by creating a simple line chart of total crimes over time.
+
+```{r}
+# Basic time series plot
+ggplot(crime_data, aes(x = date, y = total_crimes)) +
+  geom_line(color = "darkblue", size = 1) +
+  geom_point(color = "darkblue", size = 2) +
+  labs(
+    title = "Total Crimes by Month",
+    subtitle = "January 2022 - December 2024",
+    x = "Month",
+    y = "Number of Crimes"
+  ) +
+  theme_minimal()
+```
+
+### Reflection Question 1:
+Just looking at the chart:
+- Do you see an overall trend (up, down, or flat)?
+- Do you see a repeated pattern throughout the year?
+- Which months tend to have the highest crime?
+- Would you write a headline about crime "rising" or "falling"?
+
+PUT ANSWER HERE
+
+## Task 2: Calculating Percent Change (3 points)
+
+Journalists often report month-over-month or year-over-year changes. Let's calculate both.
+
+```{r}
+crime_data <- crime_data |>
+  arrange(date) |>
+  mutate(
+    # Month-over-month change
+    mom_change = total_crimes - lag(total_crimes),
+    mom_pct_change = (mom_change / lag(total_crimes)) * 100,
+
+    # Year-over-year change (compare to same month last year)
+    yoy_change = total_crimes - lag(total_crimes, 12),
+    yoy_pct_change = (yoy_change / lag(total_crimes, 12)) * 100
+  )
+
+# View recent months
+crime_data |>
+  filter(year(date) == 2024) |>
+  select(date, total_crimes, mom_pct_change, yoy_pct_change) |>
+  print(n = 12)
+```
+
+### Reflection Question 2:
+- In July 2024, what was the month-over-month change?
+- In July 2024, what was the year-over-year change?
+- Which comparison is more meaningful for understanding long-term trends? Why?
+- If you only reported the month-over-month change for December (which might be large), what would be misleading about that?
+
+PUT ANSWER HERE
+
+## Task 3: Detecting Seasonality (4 points)
+
+Many phenomena follow seasonal patterns. Let's calculate average crime by month across all years.
+
+```{r}
+# Calculate average crime for each month of the year
+seasonal_pattern <- crime_data |>
+  mutate(month_name = month(date, label = TRUE)) |>
+  group_by(month_name) |>
+  summarise(
+    avg_crimes = mean(total_crimes),
+    sd_crimes = sd(total_crimes),
+    n_years = n()
+  )
+
+seasonal_pattern
+
+# Visualize
+ggplot(seasonal_pattern, aes(x = month_name, y = avg_crimes)) +
+  geom_col(fill = "steelblue") +
+  geom_errorbar(aes(ymin = avg_crimes - sd_crimes,
+                    ymax = avg_crimes + sd_crimes),
+                width = 0.2, color = "darkred") +
+  geom_text(aes(label = round(avg_crimes, 0)), vjust = -2) +
+  labs(
+    title = "Average Monthly Crime (2022-2024)",
+    subtitle = "Error bars show standard deviation",
+    x = NULL,
+    y = "Average Number of Crimes"
+  ) +
+  theme_minimal()
+```
+
+### Reflection Question 3:
+- Which months consistently have the highest crime?
+- Which months consistently have the lowest crime?
+- What might explain this seasonal pattern?
+- If you report that "crime jumped 15% in July compared to June," why might that be misleading?
+
+PUT ANSWER HERE
+
+## Task 4: Deseasonalizing the Data (5 points)
+
+To see the real trend, we need to remove the seasonal pattern. This is called "deseasonalizing" or "seasonal adjustment."
+
+**Method:** Compare each month to the average for that month across all years.
+
+```{r}
+# Add seasonal averages to main data
+crime_data <- crime_data |>
+  mutate(month_name = month(date, label = TRUE)) |>
+  left_join(seasonal_pattern |> select(month_name, avg_crimes),
+            by = "month_name") |>
+  mutate(
+    # Deseasonalized: Actual minus seasonal average
+    deseasonalized = total_crimes - avg_crimes,
+    # As percentage
+    deseasonalized_pct = (deseasonalized / avg_crimes) * 100
+  )
+
+# Compare raw vs. deseasonalized
+crime_data |>
+  select(date, total_crimes, avg_crimes, deseasonalized, deseasonalized_pct) |>
+  tail(12)
+
+# Visualize both
+crime_data |>
+  pivot_longer(cols = c(total_crimes, deseasonalized),
+               names_to = "type",
+               values_to = "value") |>
+  ggplot(aes(x = date, y = value, color = type)) +
+  geom_line(size = 1) +
+  geom_hline(yintercept = 0, linetype = "dashed", color = "gray") +
+  scale_color_manual(
+    values = c("total_crimes" = "darkblue", "deseasonalized" = "darkred"),
+    labels = c("Deseasonalized", "Raw Total")
+  ) +
+  labs(
+    title = "Raw vs. Seasonally Adjusted Crime Data",
+    subtitle = "Deseasonalized data removes the seasonal pattern",
+    x = "Month",
+    y = "Number of Crimes (or deviation from seasonal average)",
+    color = NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+### Reflection Question 4:
+- Looking at the deseasonalized line, what's the overall trend?
+- Compare July 2024 to July 2022 using the deseasonalized values. Has crime increased or decreased?
+- Why is the deseasonalized line much flatter than the raw data?
+- When reporting "crime is up/down," should you use raw or deseasonalized data?
+
+PUT ANSWER HERE
+
+## Task 5: Calculating a Trend Line (4 points)
+
+Let's add a formal trend line to see the long-term direction.
+
+```{r}
+# Add month number for trend calculation
+crime_data <- crime_data |>
+  mutate(month_number = row_number())
+
+# Calculate linear trend
+trend_model <- lm(total_crimes ~ month_number, data = crime_data)
+summary(trend_model)
+
+# Add trend to data
+crime_data$trend <- predict(trend_model)
+
+# Visualize with trend
+ggplot(crime_data, aes(x = date)) +
+  geom_line(aes(y = total_crimes), color = "darkblue", alpha = 0.5) +
+  geom_line(aes(y = trend), color = "darkred", size = 1.5) +
+  labs(
+    title = "Crime Data with Linear Trend Line",
+    subtitle = paste0("Trend: ",
+                     ifelse(coef(trend_model)[2] > 0,
+                           "Increasing", "Decreasing"),
+                     " by ",
+                     round(abs(coef(trend_model)[2]), 1),
+                     " crimes per month"),
+    x = "Month",
+    y = "Number of Crimes"
+  ) +
+  theme_minimal()
+
+# Calculate total change over period
+first_month <- crime_data$trend[1]
+last_month <- crime_data$trend[nrow(crime_data)]
+total_change <- last_month - first_month
+pct_change <- (total_change / first_month) * 100
+
+cat("Trend analysis:\n")
+cat("Starting level (trend):", round(first_month, 0), "crimes/month\n")
+cat("Ending level (trend):", round(last_month, 0), "crimes/month\n")
+cat("Total change:", round(total_change, 0), "crimes/month\n")
+cat("Percent change:", round(pct_change, 1), "%\n")
+```
+
+### Reflection Question 5:
+- Is the trend statistically significant (look at the p-value)?
+- By how much is crime changing per month on average?
+- Over the three-year period, what's the total percent change?
+- How would you write a headline about this trend?
+
+PUT ANSWER HERE
+
+## Task 6: Identifying Anomalies (4 points)
+
+Sometimes individual months are unusual. Let's identify them statistically.
+
+```{r}
+# Calculate how many standard deviations from seasonal average
+crime_data <- crime_data |>
+  left_join(seasonal_pattern |> select(month_name, sd_crimes),
+            by = "month_name") |>
+  mutate(
+    z_score = deseasonalized / sd_crimes,
+    is_anomaly = abs(z_score) > 2  # More than 2 SD from normal
+  )
+
+# Find anomalies
+anomalies <- crime_data |>
+  filter(is_anomaly) |>
+  select(date, total_crimes, avg_crimes, deseasonalized, z_score) |>
+  arrange(desc(abs(z_score)))
+
+anomalies
+
+# Visualize anomalies
+ggplot(crime_data, aes(x = date, y = total_crimes)) +
+  geom_line(color = "gray60") +
+  geom_point(data = filter(crime_data, is_anomaly),
+             aes(color = z_score > 0),
+             size = 4) +
+  scale_color_manual(
+    values = c("TRUE" = "darkred", "FALSE" = "darkgreen"),
+    labels = c("Below expected", "Above expected")
+  ) +
+  labs(
+    title = "Crime Data with Anomalies Highlighted",
+    subtitle = "Anomalies are months >2 standard deviations from seasonal average",
+    x = "Month",
+    y = "Number of Crimes",
+    color = "Anomaly type"
+  ) +
+  theme_minimal()
+```
+
+### Reflection Question 6:
+- How many anomalous months were identified?
+- Which month was the most unusual?
+- If you're writing about an "unprecedented spike" in crime, what threshold would you use?
+- Why might December 2023 have been anomalous? (Make up a plausible explanation for this exercise)
+
+PUT ANSWER HERE
+
+## Task 7: Moving Averages (3 points)
+
+Moving averages smooth out random variation to reveal underlying trends.
+
+```{r}
+# Calculate 3-month and 6-month moving averages
+crime_data <- crime_data |>
+  arrange(date) |>
+  mutate(
+    ma_3month = zoo::rollmean(total_crimes, k = 3, fill = NA, align = "right"),
+    ma_6month = zoo::rollmean(total_crimes, k = 6, fill = NA, align = "right")
+  )
+
+# Visualize
+crime_data |>
+  pivot_longer(cols = c(total_crimes, ma_3month, ma_6month),
+               names_to = "type",
+               values_to = "value") |>
+  ggplot(aes(x = date, y = value, color = type)) +
+  geom_line(aes(size = type, alpha = type)) +
+  scale_size_manual(
+    values = c("total_crimes" = 0.5, "ma_3month" = 1, "ma_6month" = 1.5),
+    labels = c("3-month average", "6-month average", "Monthly (raw)")
+  ) +
+  scale_alpha_manual(
+    values = c("total_crimes" = 0.3, "ma_3month" = 0.7, "ma_6month" = 1),
+    labels = c("3-month average", "6-month average", "Monthly (raw)")
+  ) +
+  scale_color_manual(
+    values = c("total_crimes" = "gray60", "ma_3month" = "blue", "ma_6month" = "darkred"),
+    labels = c("3-month average", "6-month average", "Monthly (raw)")
+  ) +
+  labs(
+    title = "Moving Averages Smooth Out Variation",
+    subtitle = "Longer averages are smoother but lag behind changes",
+    x = "Month",
+    y = "Number of Crimes",
+    color = NULL,
+    size = NULL,
+    alpha = NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+### Reflection Question 7:
+- Which line is smoothest?
+- When would you use a 3-month vs. 6-month moving average?
+- Looking at the most recent months, what does the moving average suggest about the trend?
+
+PUT ANSWER HERE
+
+## Task 8: Comparing Crime Types (4 points)
+
+The dataset includes different crime categories. Let's see if they follow the same patterns.
+
+```{r}
+# Read data with crime categories
+crime_categories <- read_csv("https://raw.githubusercontent.com/dwillis/jour405/refs/heads/main/data/crime_by_category.csv") |>
+  mutate(date = ym(month))
+
+# Calculate year-over-year changes by category
+crime_categories <- crime_categories |>
+  group_by(category) |>
+  arrange(date) |>
+  mutate(
+    yoy_pct_change = (count - lag(count, 12)) / lag(count, 12) * 100
+  ) |>
+  ungroup()
+
+# Latest year-over-year changes
+latest_changes <- crime_categories |>
+  filter(year(date) == 2024, month(date) == 12) |>
+  select(category, count, yoy_pct_change) |>
+  arrange(desc(yoy_pct_change))
+
+latest_changes
+
+# Visualize trends by category
+ggplot(crime_categories, aes(x = date, y = count, color = category)) +
+  geom_line(size = 1) +
+  facet_wrap(~ category, scales = "free_y", ncol = 2) +
+  labs(
+    title = "Crime Trends by Category",
+    subtitle = "Different crime types may show different patterns",
+    x = "Month",
+    y = "Number of Incidents"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+### Reflection Question 8:
+- Which crime category increased the most year-over-year?
+- Which decreased the most?
+- Do all categories follow the same trend, or do some go up while others go down?
+- If you only reported "overall crime," what important details would you miss?
+
+PUT ANSWER HERE
+
+## Task 9: Writing Different Stories (5 points)
+
+The same data can support different headlines depending on what you emphasize. Evaluate these headlines:
+
+### Headline A: "December Crime Spike: Robberies Up 18%"
+*Compares December 2024 to November 2024 (month-over-month)*
+
+### Headline B: "Crime Falls 8% From Last Year"
+*Compares December 2024 to December 2023 (year-over-year)*
+
+### Headline C: "Crime Continues Three-Year Downward Trend"
+*Focuses on the overall trend line*
+
+### Headline D: "Crime Follows Normal Seasonal Pattern"
+*Emphasizes that changes are predictable and not anomalous*
+
+```{r}
+# Let's check what the data actually shows for December 2024
+dec_2024 <- crime_data |>
+  filter(date == "2024-12-01")
+
+nov_2024 <- crime_data |>
+  filter(date == "2024-11-01")
+
+dec_2023 <- crime_data |>
+  filter(date == "2023-12-01")
+
+# Month-over-month
+mom_change <- ((dec_2024$total_crimes - nov_2024$total_crimes) /
+                nov_2024$total_crimes) * 100
+
+# Year-over-year
+yoy_change <- ((dec_2024$total_crimes - dec_2023$total_crimes) /
+                dec_2023$total_crimes) * 100
+
+# Seasonal expectation
+dec_avg <- seasonal_pattern |>
+  filter(month_name == "Dec") |>
+  pull(avg_crimes)
+
+seasonal_deviation <- ((dec_2024$total_crimes - dec_avg) / dec_avg) * 100
+
+cat("December 2024 Crime Statistics:\n")
+cat("Actual crimes:", dec_2024$total_crimes, "\n")
+cat("Change from November:", round(mom_change, 1), "%\n")
+cat("Change from Dec 2023:", round(yoy_change, 1), "%\n")
+cat("Deviation from seasonal average:", round(seasonal_deviation, 1), "%\n")
+cat("Trend coefficient:", round(coef(trend_model)[2], 2), "crimes/month\n")
+```
+
+### Reflection Question 9:
+- Which headline is most accurate?
+- Which headline is most misleading?
+- If you were editing a story, which comparison would you require the reporter to include?
+- Write your own headline that captures the full picture:
+
+PUT ANSWER HERE
+
+## Task 10: The Complete Story (5 points)
+
+Write a news article (3-4 paragraphs) about crime trends in this city. Your article should:
+
+1. Include the most relevant comparison (explain your choice)
+2. Mention seasonal patterns
+3. Note any anomalies or unusual months
+4. Provide context from the overall trend
+5. Break down by crime type if relevant
+6. Avoid cherry-picking statistics to create a misleading narrative
+
+**Your article:**
+
+PUT ANSWER HERE
+
+## Key Takeaways
+
+1. **Time adds complexity**: Raw numbers can be misleading
+
+2. **Multiple comparisons matter**:
+   - Month-over-month: Shows immediate changes (but includes seasonality)
+   - Year-over-year: Accounts for seasonality
+   - Trend line: Shows long-term direction
+
+3. **Seasonality is common**: Crime, retail sales, unemployment all have seasonal patterns
+
+4. **Deseasonalize when appropriate**: Removes predictable patterns to reveal real changes
+
+5. **Moving averages smooth noise**: Useful for seeing underlying trends
+
+6. **Context is critical**: A "spike" might be normal for that time of year
+
+7. **Different stories from same data**: Choose comparisons that give the full picture
+
+## Common Time Series Mistakes in Journalism
+
+### ❌ Mistake 1: Comparing uncomparable months
+"January employment down 15% from December" (ignores that post-holiday drops are normal)
+
+### ❌ Mistake 2: Cherry-picking the comparison
+Choosing the time period that makes the story more dramatic
+
+### ❌ Mistake 3: Ignoring the trend
+"Crime up this month!" (but down overall for the year)
+
+### ❌ Mistake 4: Treating seasonal as surprising
+"Holiday retail sales surge in December!" (this happens every year)
+
+### ❌ Mistake 5: No context
+Reporting a number without comparison to previous periods or expectations
+
+## Final Reflection
+
+### Reflection Question 10:
+Find a news article that reports changes over time (crime, economy, COVID cases, etc.). Evaluate it:
+- What time comparison did they use?
+- Did they mention seasonal patterns?
+- Did they provide context from longer-term trends?
+- If you were editing this piece, what would you add or change?
+
+PUT ANSWER HERE
+
+### Reflection Question 11:
+Why do you think journalists often make the mistakes listed above? What pressures or incentives might lead to misleading time series reporting?
+
+PUT ANSWER HERE
+
+When finished, save your work, switch to GitHub Desktop, then add, commit and push your changes to GitHub and submit the URL of the notebook in ELMS.

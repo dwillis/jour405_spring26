@@ -1,0 +1,536 @@
+---
+title: "Causal Inference: When Can You Say X Causes Y?"
+author: "Your Name"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Introduction
+
+"Chocolate causes weight loss!" "Video games cause violence!" "Coffee prevents Alzheimer's!"
+
+Every day, news outlets report studies claiming one thing causes another. But most studies only show correlation, not causation. As a journalist, you need to know the difference—and when you can legitimately report a causal relationship.
+
+This activity teaches you to:
+- Distinguish correlation from causation
+- Identify confounding variables
+- Evaluate what types of evidence support causal claims
+- Write accurately about study findings without overstating conclusions
+
+## The Classic Example: Ice Cream and Drowning
+
+Let's start with a famous example that shows why correlation doesn't equal causation.
+
+```{r}
+# Simulated monthly data
+months <- c("Jan", "Feb", "Mar", "Apr", "May", "Jun",
+            "Jul", "Aug", "Sep", "Oct", "Nov", "Dec")
+
+ice_cream_sales <- c(20, 25, 35, 55, 80, 110, 130, 125, 90, 60, 35, 25)
+drowning_deaths <- c(2, 2, 3, 5, 8, 11, 13, 12, 9, 6, 3, 2)
+temperature <- c(35, 38, 48, 58, 68, 78, 85, 83, 72, 60, 45, 38)
+
+summer_data <- tibble(
+  month = factor(months, levels = months),
+  ice_cream_sales = ice_cream_sales,
+  drowning_deaths = drowning_deaths,
+  temperature = temperature
+)
+
+# Calculate correlation
+cor_ice_cream_drowning <- cor(ice_cream_sales, drowning_deaths)
+
+# Visualize
+ggplot(summer_data, aes(x = ice_cream_sales, y = drowning_deaths)) +
+  geom_point(size = 3, color = "darkblue") +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "Ice Cream Sales vs. Drowning Deaths",
+    subtitle = paste0("Correlation: r = ", round(cor_ice_cream_drowning, 3)),
+    x = "Ice Cream Sales (thousands)",
+    y = "Drowning Deaths"
+  ) +
+  theme_minimal()
+```
+
+### Reflection Question 1:
+The correlation between ice cream sales and drowning deaths is very strong (r ≈ 0.95). Does ice cream cause drowning? What's the real explanation?
+
+PUT ANSWER HERE
+
+## The Three Alternative Explanations
+
+When you observe a correlation between X and Y, there are always at least three possible explanations:
+
+### Explanation 1: X causes Y
+Ice cream causes drowning
+
+### Explanation 2: Y causes X
+Drowning causes people to buy ice cream (Doesn't make sense here!)
+
+### Explanation 3: Z causes both X and Y (confounding)
+Temperature causes both ice cream sales AND drowning (people swim more when it's hot)
+
+Let's visualize this:
+
+```{r}
+# Show temperature as the confounding variable
+summer_data |>
+  pivot_longer(cols = c(ice_cream_sales, drowning_deaths),
+               names_to = "variable",
+               values_to = "value") |>
+  ggplot(aes(x = month, y = value, color = variable, group = variable)) +
+  geom_line(size = 1.5) +
+  geom_point(size = 3) +
+  scale_color_manual(values = c("ice_cream_sales" = "brown",
+                                "drowning_deaths" = "darkblue"),
+                    labels = c("Drowning Deaths", "Ice Cream Sales")) +
+  labs(
+    title = "Both Follow the Same Seasonal Pattern",
+    subtitle = "Temperature is the confounding variable",
+    x = "Month",
+    y = "Scaled Values",
+    color = NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+## Task 1: Identifying Confounding Variables
+
+For each correlation below, identify the most likely confounding variable.
+
+### Scenario A: Number of firefighters and damage from fires
+
+Cities that send more firefighters to fires experience more fire damage.
+
+```{r}
+# Simulated data
+set.seed(123)
+fire_data <- tibble(
+  city = paste("City", 1:20),
+  firefighters_sent = c(5, 8, 12, 15, 18, 22, 25, 28, 32, 35,
+                       40, 45, 50, 55, 60, 65, 70, 75, 80, 85),
+  fire_damage = firefighters_sent * 15 + rnorm(20, 0, 50)
+)
+
+ggplot(fire_data, aes(x = firefighters_sent, y = fire_damage)) +
+  geom_point(size = 3) +
+  geom_smooth(method = "lm", se = FALSE) +
+  labs(
+    title = "More Firefighters, More Damage?",
+    x = "Number of Firefighters Sent",
+    y = "Fire Damage ($1000s)"
+  ) +
+  theme_minimal()
+
+cat("Correlation:", round(cor(fire_data$firefighters_sent,
+                              fire_data$fire_damage), 3))
+```
+
+**Question:** Does sending more firefighters cause more damage? What's the confounding variable?
+
+PUT ANSWER HERE
+
+### Scenario B: Education spending and test scores
+
+States that spend more per pupil tend to have lower average test scores.
+
+**Question:** Does spending more on education lower test scores? What might explain this negative correlation?
+
+PUT ANSWER HERE
+
+### Scenario C: Hospital mortality rates
+
+Hospitals with more doctors have higher patient death rates.
+
+**Question:** Do doctors cause patient deaths? What's actually happening?
+
+PUT ANSWER HERE
+
+## Task 2: The Gold Standard—Randomized Experiments
+
+The best evidence for causation comes from randomized controlled trials (RCTs). Let's see why.
+
+### Non-randomized observation:
+"People who take vitamin supplements are healthier than those who don't."
+
+Possible confounding: People who take vitamins may also exercise more, eat better, and have better healthcare access.
+
+### Randomized experiment:
+1. Take 1,000 people
+2. **Randomly** assign 500 to take vitamins, 500 to take placebo
+3. Compare health outcomes
+
+Why randomization matters: By randomly assigning treatment, you ensure the groups are similar in all other ways. Any difference in outcomes must be due to the treatment.
+
+```{r}
+# Simulate a randomized experiment
+set.seed(456)
+
+# Create two groups
+experiment_data <- tibble(
+  person_id = 1:1000,
+  treatment = sample(c("Vitamin", "Placebo"), 1000, replace = TRUE),
+  # Simulate baseline health (same distribution for both groups)
+  baseline_health = rnorm(1000, mean = 70, sd = 10),
+  # Add small treatment effect for vitamin group
+  health_outcome = baseline_health +
+    if_else(treatment == "Vitamin", 3, 0) +
+    rnorm(1000, 0, 8)
+)
+
+# Compare groups
+experiment_summary <- experiment_data |>
+  group_by(treatment) |>
+  summarise(
+    n = n(),
+    mean_baseline = mean(baseline_health),
+    mean_outcome = mean(health_outcome),
+    improvement = mean_outcome - mean_baseline
+  )
+
+experiment_summary
+
+# Visualize
+ggplot(experiment_data, aes(x = treatment, y = health_outcome, fill = treatment)) +
+  geom_boxplot(alpha = 0.7) +
+  labs(
+    title = "Health Outcomes: Randomized Controlled Trial",
+    x = NULL,
+    y = "Health Score"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+### Reflection Question 2:
+- Are the baseline health scores similar between groups? Why?
+- Is the difference in outcomes likely due to the vitamin or some other factor?
+- Why is randomization crucial for causal claims?
+
+PUT ANSWER HERE
+
+## Task 3: Evaluating Study Designs
+
+Different study designs provide different levels of evidence for causation. Rank these from weakest to strongest evidence:
+
+```{r}
+study_types <- tibble(
+  design = c("Anecdote/Case Study",
+             "Cross-sectional Survey",
+             "Observational Cohort Study",
+             "Randomized Controlled Trial",
+             "Meta-analysis of RCTs"),
+
+  description = c(
+    "A single person's experience",
+    "Survey asking people about habits and outcomes at one time",
+    "Follow people over time, compare those who do X vs. don't",
+    "Randomly assign people to treatment or control",
+    "Combine results from multiple randomized trials"
+  ),
+
+  example = c(
+    "I ate kale and lost 10 pounds",
+    "Coffee drinkers report less depression",
+    "Track 10,000 people for 20 years, compare diet and health",
+    "Randomly assign 500 people to exercise program or not",
+    "Combine 30 studies on exercise and heart health"
+  ),
+
+  strength = c(1, 2, 3, 4, 5),  # 1 = weakest, 5 = strongest
+
+  can_claim_causation = c("No", "No", "Maybe", "Yes", "Yes (strongest)")
+)
+
+study_types
+```
+
+### Reflection Question 3:
+- Why is a randomized controlled trial stronger evidence than an observational study?
+- Can you ever claim causation from an observational study? When?
+- If a journalist says "New study proves X causes Y," what study design should they be reporting on?
+
+PUT ANSWER HERE
+
+## Task 4: The Bradford Hill Criteria
+
+Even without randomization, scientists use several criteria to evaluate whether a correlation might be causal. These are called the Bradford Hill criteria:
+
+1. **Strength**: Strong correlations are more likely to be causal
+2. **Consistency**: Multiple studies find the same relationship
+3. **Temporality**: Cause must come before effect
+4. **Dose-response**: More exposure → stronger effect
+5. **Plausibility**: There's a logical mechanism
+6. **Experiment**: Experimental evidence supports it
+
+Let's apply these to a real example: **Smoking and lung cancer**
+
+```{r}
+# Simulated data showing dose-response relationship
+smoking_data <- tibble(
+  cigarettes_per_day = c(0, 5, 10, 15, 20, 30, 40),
+  lung_cancer_risk = c(1, 3, 6, 11, 18, 35, 60),  # Risk relative to non-smokers
+  group_label = c("Non-smoker", "Light", "Light", "Moderate",
+                  "Moderate", "Heavy", "Heavy")
+)
+
+ggplot(smoking_data, aes(x = cigarettes_per_day, y = lung_cancer_risk)) +
+  geom_line(size = 1.5, color = "darkred") +
+  geom_point(size = 4, color = "darkred") +
+  labs(
+    title = "Smoking and Lung Cancer: Dose-Response Relationship",
+    x = "Cigarettes per Day",
+    y = "Relative Risk of Lung Cancer"
+  ) +
+  theme_minimal()
+```
+
+**Evaluating smoking → lung cancer:**
+- ✓ Strength: Very strong correlation
+- ✓ Consistency: Hundreds of studies confirm it
+- ✓ Temporality: Smoking precedes cancer
+- ✓ Dose-response: More smoking → higher risk (see chart)
+- ✓ Plausibility: We understand biological mechanisms
+- ✓ Experiment: Animal studies show causation
+
+**Conclusion:** Even without randomized human trials (which would be unethical), we can confidently say smoking causes cancer.
+
+### Your Turn: Evaluate Coffee and Alzheimer's
+
+Studies show coffee drinkers have lower rates of Alzheimer's disease. Use the Bradford Hill criteria:
+
+**1. Strength:** Moderate correlation (20-30% lower risk)
+
+**2. Consistency:** FILL IN - Have multiple studies found this?
+
+**3. Temporality:** FILL IN - Does coffee drinking precede Alzheimer's or vice versa?
+
+**4. Dose-response:** FILL IN - Do people who drink more coffee have even lower risk?
+
+**5. Plausibility:** FILL IN - Is there a biological mechanism that makes sense?
+
+**6. Experiment:** FILL IN - Have randomized trials been conducted?
+
+**Overall:** Can you claim coffee prevents Alzheimer's? How would you report this finding?
+
+PUT ANSWER HERE
+
+## Task 5: Reverse Causation
+
+Sometimes the causal arrow points the opposite direction from what you'd think.
+
+### Example: Depression and Social Media
+
+**Observation:** People who spend more time on social media report higher depression rates.
+
+**Headlines you might see:**
+- "Social Media Causes Depression"
+- "Teenagers' Mental Health Crisis Linked to Instagram"
+
+But consider: **Could depression cause social media use?**
+
+Depressed people might:
+- Isolate themselves socially → Use social media more to connect
+- Have difficulty sleeping → Scroll late at night
+- Seek validation → Post more frequently
+
+```{r}
+# Both causal directions are plausible
+causal_directions <- tibble(
+  direction = c("Social Media → Depression",
+                "Depression → Social Media",
+                "Confounding Variable → Both"),
+
+  explanation = c(
+    "Using social media causes comparison, cyberbullying, FOMO",
+    "Depressed people use social media more to cope or connect",
+    "Loneliness causes both depression and social media use"
+  ),
+
+  evidence_needed = c(
+    "RCT: Reduce social media use, measure depression change",
+    "RCT: Treat depression, measure social media use change",
+    "Measure loneliness, see if it explains both"
+  )
+)
+
+causal_directions
+```
+
+### Reflection Question 4:
+- Why is it important to consider reverse causation?
+- How would you report on the social media-depression correlation without overstating causation?
+- What additional information would you want before writing a story?
+
+PUT ANSWER HERE
+
+## Task 6: The Time Order Problem
+
+For X to cause Y, X must happen before Y. This seems obvious, but journalists often get it wrong.
+
+### Scenario: School Funding and Test Scores
+
+**Claim:** "Increased school funding led to higher test scores"
+
+**Data:** Schools that received more funding this year had higher test scores.
+
+**Problem:** What if high-performing schools from last year received more funding as a reward? Then high test scores caused increased funding, not the reverse.
+
+```{r}
+# Simulate the scenario
+set.seed(789)
+school_data <- tibble(
+  school = paste("School", 1:50),
+  test_scores_2023 = rnorm(50, mean = 70, sd = 10),
+  # Funding in 2024 based on 2023 scores
+  funding_2024 = 10000 + (test_scores_2023 - 70) * 500 + rnorm(50, 0, 1000),
+  # Scores in 2024 slightly correlated with 2023 scores
+  test_scores_2024 = test_scores_2023 + rnorm(50, 2, 5)
+)
+
+# This analysis is WRONG because it doesn't account for time order
+ggplot(school_data, aes(x = funding_2024, y = test_scores_2024)) +
+  geom_point(size = 3) +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(
+    title = "Misleading Analysis: Funding and Test Scores",
+    subtitle = "Correlation exists, but funding came AFTER high scores",
+    x = "2024 Funding",
+    y = "2024 Test Scores"
+  ) +
+  theme_minimal()
+```
+
+### Reflection Question 5:
+- What's wrong with the analysis above?
+- How would you need to structure the data to test whether funding causes score increases?
+- What would you ask a school district that claimed funding caused score improvements?
+
+PUT ANSWER HERE
+
+## Task 7: Writing Accurately About Causation
+
+Here are pairs of headlines about the same study. Which is more accurate?
+
+### Study 1: Observational study of 10,000 people over 10 years
+
+**Version A:** "Exercise Prevents Heart Disease"
+**Version B:** "People Who Exercise Have Lower Heart Disease Rates"
+
+Which is better? Why?
+
+PUT ANSWER HERE
+
+### Study 2: Randomized trial of 500 participants
+
+**Version A:** "Mediterranean Diet Linked to Weight Loss"
+**Version B:** "Mediterranean Diet Causes Weight Loss in Clinical Trial"
+
+Which is better? Why?
+
+PUT ANSWER HERE
+
+### Study 3: Survey of 1,000 students
+
+**Version A:** "Study: Video Games Cause Poor Grades"
+**Version B:** "Students Who Play Video Games Have Lower GPAs"
+
+Which is better? Why?
+
+PUT ANSWER HERE
+
+## Task 8: Real-World Application
+
+You're writing about a new study on remote work and productivity. The study followed 2,000 employees over one year. Those who worked remotely 3+ days per week completed 13% more projects than those who worked in-office.
+
+**Answer these questions before writing:**
+
+1. What type of study is this (randomized, observational, etc.)?
+
+PUT ANSWER HERE
+
+2. Can you say remote work **causes** higher productivity?
+
+PUT ANSWER HERE
+
+3. What are three possible confounding variables?
+
+PUT ANSWER HERE
+
+4. What additional information would you want from the researchers?
+
+PUT ANSWER HERE
+
+5. Write a headline and lead paragraph that accurately represents the findings:
+
+PUT ANSWER HERE
+
+## Task 9: The Checklist
+
+Before you report a causal claim, ask these questions:
+
+```{r}
+causal_checklist <- tibble(
+  question = c(
+    "Was this a randomized experiment?",
+    "If not, what confounding variables might exist?",
+    "Does the cause come before the effect?",
+    "Could reverse causation explain this?",
+    "Is there a dose-response relationship?",
+    "Have multiple studies found the same thing?",
+    "Is there a plausible mechanism?",
+    "What do the researchers themselves claim?",
+    "Am I overstating the findings?"
+  ),
+
+  if_yes = c(
+    "Stronger evidence for causation",
+    "Mention these in your story",
+    "Necessary for causation",
+    "Mention this possibility",
+    "Stronger evidence for causation",
+    "Stronger evidence for causation",
+    "Include this in explanation",
+    "Don't go beyond their claims",
+    "Revise your language"
+  )
+)
+
+causal_checklist
+```
+
+## Key Takeaways
+
+1. **Correlation ≠ Causation**: Always consider confounding variables
+
+2. **Three explanations**: X causes Y, Y causes X, or Z causes both
+
+3. **Randomization is key**: Random assignment eliminates confounding
+
+4. **Time matters**: Cause must precede effect
+
+5. **Dose-response strengthens claims**: More X → more Y suggests causation
+
+6. **Write precisely**:
+   - Observational: "linked to," "associated with," "correlated with"
+   - Experimental: "caused," "led to," "resulted in"
+
+7. **When in doubt**: Ask the researchers what they claim, and don't overstate
+
+## Final Reflection
+
+### Reflection Question 6:
+Find a recent news article that makes a causal claim. Evaluate it:
+- What type of study was it?
+- Does the evidence support the causal claim?
+- Did the journalist overstate the findings?
+- How would you rewrite it to be more accurate?
+
+PUT ANSWER HERE
+
+When finished, save your work, switch to GitHub Desktop, then add, commit and push your changes to GitHub and submit the URL of the notebook in ELMS.

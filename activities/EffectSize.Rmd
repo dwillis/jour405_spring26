@@ -1,0 +1,304 @@
+---
+title: "Understanding Effect Size: When Statistical Significance Isn't Enough"
+author: "Your Name"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Introduction
+
+You've learned to calculate p-values and determine statistical significance. But significance only tells you whether a difference exists—not whether it matters. A study with thousands of participants can find "statistically significant" results that are practically meaningless.
+
+Effect size measures the magnitude of a difference or relationship. It answers the question: "How big is this effect in real-world terms?"
+
+## The Problem: Statistical Significance Can Be Misleading
+
+### Scenario 1: A Significant but Trivial Difference
+
+A university claims a new online tutoring program improves student grades. They conducted a study:
+
+- Sample size: 5,000 students
+- Old average GPA: 3.12
+- New average GPA: 3.15
+- p-value: 0.003 (statistically significant!)
+
+```{r}
+# Simulate the scenario
+old_gpa <- 3.12
+new_gpa <- 3.15
+difference <- new_gpa - old_gpa
+sample_size <- 5000
+
+cat("Difference in GPA:", difference, "\n")
+cat("p-value: 0.003 (statistically significant!)\n")
+cat("Headline: 'New Program Significantly Improves Student Grades'\n")
+```
+
+### Reflection Question 1:
+Is a 0.03 GPA improvement worth the university spending $500,000 on this program? Would you run this story as-is, or would you need more context?
+
+PUT ANSWER HERE
+
+## What Is Effect Size?
+
+Effect size standardizes the difference so you can compare across studies. The most common measure is **Cohen's d**:
+
+**Cohen's d = (Mean1 - Mean2) / Standard Deviation**
+
+### Interpreting Cohen's d:
+- **0.2** = small effect
+- **0.5** = medium effect
+- **0.8** = large effect
+
+These aren't strict rules, but they provide context.
+
+```{r}
+# Calculate Cohen's d for the GPA example
+old_gpa_mean <- 3.12
+new_gpa_mean <- 3.15
+gpa_sd <- 0.45  # Typical GPA standard deviation
+
+cohens_d <- (new_gpa_mean - old_gpa_mean) / gpa_sd
+
+cat("Cohen's d:", round(cohens_d, 3), "\n")
+cat("Interpretation: ",
+    if(cohens_d < 0.2) "negligible effect"
+    else if(cohens_d < 0.5) "small effect"
+    else if(cohens_d < 0.8) "medium effect"
+    else "large effect", "\n")
+```
+
+### Reflection Question 2:
+How does knowing the effect size change your understanding of the tutoring program's impact?
+
+PUT ANSWER HERE
+
+## Task 1: Reading Program Effect Size
+
+Let's revisit a scenario similar to your hypothesis testing homework. A superintendent claims a new reading program improved third-grade scores.
+
+**Before program:**
+- Mean: 72.6 points
+- SD: 4.8 points
+
+**After program (12 classrooms):**
+- Scores: 74, 76, 73, 75, 78, 77, 74, 79, 75, 76, 77, 75
+
+```{r}
+# Data setup
+prior_mean <- 72.6
+prior_sd <- 4.8
+new_scores <- c(74, 76, 73, 75, 78, 77, 74, 79, 75, 76, 77, 75)
+
+# Calculate new mean
+new_mean <- mean(new_scores)
+difference <- new_mean - prior_mean
+
+# Perform t-test
+t_result <- t.test(new_scores, mu = prior_mean, alternative = "greater")
+
+# Calculate Cohen's d
+cohens_d <- (new_mean - prior_mean) / prior_sd
+
+# Display results
+cat("Mean before:", prior_mean, "\n")
+cat("Mean after:", round(new_mean, 2), "\n")
+cat("Difference:", round(difference, 2), "points\n")
+cat("p-value:", round(t_result$p.value, 4), "\n")
+cat("Cohen's d:", round(cohens_d, 3), "\n")
+```
+
+### Reflection Question 3:
+- Is the difference statistically significant?
+- What is the effect size? Is it small, medium, or large?
+- How would you describe this result to a non-technical reader?
+
+PUT ANSWER HERE
+
+## Task 2: Comparing Multiple Interventions
+
+A school district tested three different math tutoring programs in different schools. All three showed statistically significant improvements (p < 0.05), but which had the biggest real-world impact?
+
+```{r}
+# Program data
+programs <- tibble(
+  program = c("Online Videos", "Small Group", "One-on-One"),
+  n = c(200, 80, 30),
+  mean_before = c(65, 64, 63),
+  mean_after = c(67, 72, 75),
+  sd = c(12, 11, 13),
+  p_value = c(0.012, 0.003, 0.045)
+)
+
+# Calculate effect sizes
+programs <- programs |>
+  mutate(
+    difference = mean_after - mean_before,
+    cohens_d = difference / sd,
+    effect_interpretation = case_when(
+      cohens_d < 0.2 ~ "negligible",
+      cohens_d < 0.5 ~ "small",
+      cohens_d < 0.8 ~ "medium",
+      TRUE ~ "large"
+    )
+  )
+
+programs
+```
+
+### Reflection Question 4:
+- Which program had the smallest p-value?
+- Which program had the largest effect size?
+- If you could only fund one program district-wide, which would you choose and why?
+- How would you explain this choice to school board members?
+
+PUT ANSWER HERE
+
+## Task 3: Visualizing the Difference
+
+Let's visualize why effect size matters by comparing two scenarios with identical p-values but different effect sizes.
+
+```{r}
+set.seed(123)
+
+# Scenario A: Large sample, small effect
+groupA_control <- rnorm(500, mean = 100, sd = 15)
+groupA_treatment <- rnorm(500, mean = 102, sd = 15)
+
+# Scenario B: Smaller sample, large effect
+groupB_control <- rnorm(50, mean = 100, sd = 15)
+groupB_treatment <- rnorm(50, mean = 110, sd = 15)
+
+# Calculate statistics for both
+scenarioA_d <- (mean(groupA_treatment) - mean(groupA_control)) / 15
+scenarioB_d <- (mean(groupB_treatment) - mean(groupB_control)) / 15
+
+scenarioA_t <- t.test(groupA_treatment, groupA_control)
+scenarioB_t <- t.test(groupB_treatment, groupB_control)
+
+# Create visualization data
+viz_data <- tibble(
+  scenario = rep(c("A: Large Sample,\nSmall Effect",
+                   "B: Smaller Sample,\nLarge Effect"), each = 2),
+  group = rep(c("Control", "Treatment"), 2),
+  mean = c(mean(groupA_control), mean(groupA_treatment),
+           mean(groupB_control), mean(groupB_treatment))
+)
+
+# Plot
+ggplot(viz_data, aes(x = group, y = mean, fill = group)) +
+  geom_col() +
+  facet_wrap(~ scenario) +
+  geom_text(aes(label = round(mean, 1)), vjust = -0.5) +
+  labs(
+    title = "Statistical Significance vs. Practical Significance",
+    subtitle = "Both scenarios have p < 0.05, but very different effect sizes",
+    y = "Score",
+    x = NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+cat("\nScenario A:\n")
+cat("  Difference:", round(mean(groupA_treatment) - mean(groupA_control), 2), "\n")
+cat("  Cohen's d:", round(scenarioA_d, 3), "\n")
+cat("  p-value:", round(scenarioA_t$p.value, 4), "\n")
+
+cat("\nScenario B:\n")
+cat("  Difference:", round(mean(groupB_treatment) - mean(groupB_control), 2), "\n")
+cat("  Cohen's d:", round(scenarioB_d, 3), "\n")
+cat("  p-value:", round(scenarioB_t$p.value, 4), "\n")
+```
+
+### Reflection Question 5:
+Both scenarios are statistically significant. Which intervention would you rather report on? Why?
+
+PUT ANSWER HERE
+
+## Task 4: Writing With Effect Sizes
+
+Here are three versions of the same finding. Which is most informative?
+
+**Version 1 (p-value only):**
+"The new curriculum significantly improved test scores (p = 0.003)."
+
+**Version 2 (difference only):**
+"The new curriculum raised test scores by 4 points on average."
+
+**Version 3 (complete picture):**
+"The new curriculum raised test scores by 4 points on average (from 72 to 76), representing a moderate effect size (Cohen's d = 0.6). The improvement was statistically significant (p = 0.003)."
+
+### Your Turn: Rewrite This Weak Headline
+
+**Original:** "Study Shows Coffee Drinkers Have Significantly Lower Depression Rates"
+
+**Study details:**
+- 10,000 participants
+- Depression score: Coffee drinkers = 12.3, Non-drinkers = 12.8 (scale: 0-60)
+- Cohen's d = 0.08
+- p < 0.001
+
+Rewrite the headline and lead paragraph to accurately reflect both statistical significance and effect size:
+
+PUT ANSWER HERE
+
+## Task 5: Real-World Application
+
+You're covering a story about a new police body camera program. The police department claims body cameras "significantly reduced use-of-force incidents."
+
+```{r}
+# Police department data
+before_cameras <- 156  # incidents per year
+after_cameras <- 143   # incidents per year
+years_before <- 3
+years_after <- 2
+sd_incidents <- 18  # typical variation per year
+
+# Calculate statistics
+mean_before <- before_cameras
+mean_after <- after_cameras
+difference <- mean_before - mean_after
+pct_change <- (difference / mean_before) * 100
+cohens_d <- difference / sd_incidents
+
+cat("Before body cameras:", before_cameras, "incidents/year\n")
+cat("After body cameras:", after_cameras, "incidents/year\n")
+cat("Difference:", difference, "incidents\n")
+cat("Percent change:", round(pct_change, 1), "%\n")
+cat("Effect size (Cohen's d):", round(cohens_d, 3), "\n")
+```
+
+### Reflection Question 6:
+- Is this a large, medium, small, or negligible effect?
+- The police chief wants to credit the body cameras. What alternative explanations would you investigate?
+- How would you report this finding accurately without overstating or understating the impact?
+
+PUT ANSWER HERE
+
+## Key Takeaways
+
+1. **Statistical significance ≠ practical importance**: Large samples can make tiny differences "significant"
+
+2. **Effect size provides context**: It tells you if a difference matters in the real world
+
+3. **Report both**: Give readers the p-value (is it real?) and effect size (does it matter?)
+
+4. **Cohen's d interpretation:**
+   - < 0.2: Negligible
+   - 0.2-0.5: Small
+   - 0.5-0.8: Medium
+   - > 0.8: Large
+
+5. **Ask: "So what?"**: A statistically significant finding might not be newsworthy if the effect is tiny
+
+## Final Reflection
+
+### Reflection Question 7:
+Think of a recent news story you've read that cited a study. Did it mention effect size or just statistical significance? How might understanding effect size change how that story should have been reported?
+
+PUT ANSWER HERE
+
+When finished, save your work, switch to GitHub Desktop, then add, commit and push your changes to GitHub and submit the URL of the notebook in ELMS.

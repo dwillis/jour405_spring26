@@ -1,0 +1,448 @@
+---
+title: "Polling Fundamentals: Understanding Margin of Error"
+name: "REPLACE WITH YOUR NAME"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE)
+library(tidyverse)
+```
+
+## Introduction
+
+Journalists report poll results constantly: election forecasts, approval ratings, public opinion surveys. But understanding what those numbers really mean requires understanding margin of error, confidence intervals, and sampling error.
+
+This homework will teach you to:
+- Calculate margins of error from sample size
+- Interpret "within the margin of error"
+- Evaluate when differences between poll results are meaningful
+- Spot problematic polling methodology in news coverage
+
+## The Basics: Why Polls Have Margins of Error
+
+When you poll 1,000 voters instead of all 100 million voters, your results contain uncertainty. The margin of error quantifies that uncertainty.
+
+**Key concept:** If you conducted the same poll 100 times, about 95 of those polls would produce results within the margin of error of the true population value.
+
+## Task 1: The Relationship Between Sample Size and Margin of Error
+
+The formula for margin of error (at 95% confidence) is:
+
+**MOE = 1.96 × √(p × (1-p) / n)**
+
+Where:
+- p = proportion (for maximum margin, use 0.5)
+- n = sample size
+- 1.96 = z-score for 95% confidence
+
+When p = 0.5 (50%), this simplifies to approximately: **MOE ≈ 1 / √n**
+
+Let's see how sample size affects margin of error:
+
+```{r}
+# Calculate MOE for different sample sizes
+sample_sizes <- c(100, 400, 600, 1000, 1500, 2000, 3000, 5000)
+
+moe_data <- tibble(
+  sample_size = sample_sizes,
+  margin_of_error = 1.96 * sqrt(0.25 / sample_size) * 100  # Convert to percentage
+)
+
+moe_data
+
+# Visualize
+ggplot(moe_data, aes(x = sample_size, y = margin_of_error)) +
+  geom_line(color = "darkblue", size = 1.5) +
+  geom_point(color = "darkblue", size = 3) +
+  geom_text(aes(label = paste0("±", round(margin_of_error, 1), "%")),
+            vjust = -1, size = 3) +
+  labs(
+    title = "Sample Size vs. Margin of Error",
+    subtitle = "At 95% confidence level",
+    x = "Sample Size",
+    y = "Margin of Error (percentage points)"
+  ) +
+  theme_minimal()
+```
+
+### Reflection Question 1:
+- What happens to margin of error as sample size increases?
+- Going from 1,000 to 2,000 respondents, how much does the margin of error decrease?
+- Going from 2,000 to 4,000 respondents, how much does it decrease?
+- Why might polling organizations typically use samples of around 1,000 people?
+
+PUT ANSWER HERE
+
+## Task 2: Calculating Margin of Error for a Real Poll
+
+A polling organization surveyed voters about an upcoming mayoral race. Calculate the margin of error.
+
+**Poll details:**
+- Sample size: 750 registered voters
+- Candidate A: 42%
+- Candidate B: 38%
+- Undecided: 20%
+
+```{r}
+# Poll data
+n <- REPLACE_ME  # sample size
+candidate_a_pct <- 42
+candidate_b_pct <- 38
+
+# Calculate margin of error (using the conservative 50% assumption)
+moe <- 1.96 * sqrt(0.25 / n) * 100
+
+cat("Sample size:", n, "\n")
+cat("Margin of error: ±", round(moe, 1), "percentage points\n")
+
+# Calculate the ranges for each candidate
+a_lower <- candidate_a_pct - moe
+a_upper <- candidate_a_pct + moe
+b_lower <- candidate_b_pct - moe
+b_upper <- candidate_b_pct + moe
+
+cat("\nCandidate A: ", candidate_a_pct, "% (range: ",
+    round(a_lower, 1), "% to ", round(a_upper, 1), "%)\n", sep = "")
+cat("Candidate B: ", candidate_b_pct, "% (range: ",
+    round(b_lower, 1), "% to ", round(b_upper, 1), "%)\n", sep = "")
+```
+
+### Reflection Question 2:
+- What is the margin of error for this poll?
+- Do the confidence intervals for Candidate A and Candidate B overlap?
+- Can you confidently say Candidate A is leading? Why or why not?
+- Write a headline and first sentence for this poll result that accurately conveys the uncertainty.
+
+PUT ANSWER HERE
+
+## Task 3: Understanding "Statistical Tie"
+
+News outlets often say a race is a "statistical tie" when the difference is within the margin of error. Let's examine what this means.
+
+```{r}
+# Different polling scenarios
+scenarios <- tibble(
+  scenario = c("A", "B", "C", "D"),
+  sample_size = c(1000, 1000, 2000, 500),
+  candidate_1 = c(48, 48, 48, 48),
+  candidate_2 = c(45, 42, 46, 44)
+)
+
+# Calculate MOE and whether it's a statistical tie
+scenarios <- scenarios |>
+  mutate(
+    moe = round(1.96 * sqrt(0.25 / sample_size) * 100, 1),
+    difference = candidate_1 - candidate_2,
+    # Rule: If difference < 2 × MOE, it's within the margin of error
+    statistical_tie = difference < (2 * moe),
+    interpretation = if_else(statistical_tie,
+                            "Too close to call",
+                            "Leader is ahead outside MOE")
+  )
+
+scenarios
+```
+
+### Reflection Question 3:
+- In which scenario(s) is the race a statistical tie?
+- Scenario A and B have the same sample size and same leading candidate percentage. Why is B not a statistical tie while A is?
+- How does sample size affect whether a 2-point lead is meaningful? (Compare scenarios A and C)
+- If you were writing headlines for these four scenarios, how would they differ?
+
+PUT ANSWER HERE
+
+## Task 4: The Margin of Error for Subgroups
+
+Polls often report results for demographic subgroups: "Among women, Candidate A leads 52%-38%." But subgroups have larger margins of error because they're smaller samples.
+
+```{r}
+# Main poll
+total_sample <- 1200
+overall_moe <- 1.96 * sqrt(0.25 / total_sample) * 100
+
+# Subgroups (assume roughly equal distribution)
+women_sample <- 600  # About 50% of sample
+young_voters_sample <- 240  # About 20% of sample
+rural_voters_sample <- 180  # About 15% of sample
+
+subgroups <- tibble(
+  group = c("Overall", "Women", "Young voters (18-29)", "Rural voters"),
+  sample_size = c(total_sample, women_sample, young_voters_sample, rural_voters_sample),
+  moe = 1.96 * sqrt(0.25 / sample_size) * 100
+)
+
+subgroups
+
+# Visualize
+ggplot(subgroups, aes(x = reorder(group, -sample_size), y = moe)) +
+  geom_col(fill = "steelblue") +
+  geom_text(aes(label = paste0("±", round(moe, 1), "%\n(n=", sample_size, ")")),
+            vjust = -0.5, size = 3) +
+  labs(
+    title = "Margin of Error Increases for Smaller Subgroups",
+    x = NULL,
+    y = "Margin of Error (percentage points)"
+  ) +
+  theme_minimal() +
+  theme(axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Reflection Question 4:
+- How much larger is the margin of error for rural voters compared to the overall sample?
+- A news article reports: "Among rural voters, Candidate A leads 52% to 48%." Is this a meaningful lead?
+- Why should journalists be more cautious when reporting subgroup results?
+- What would you ask a polling organization before reporting subgroup findings?
+
+PUT ANSWER HERE
+
+## Task 5: Detecting Questionable Polls
+
+You're fact-checking claims from two different polls. Evaluate their credibility.
+
+```{r}
+# Poll 1: Congressional Race
+poll1 <- list(
+  name = "Congressional Poll",
+  sample_size = 312,
+  method = "Online panel",
+  candidate_a = 51,
+  candidate_b = 41,
+  headline = "Candidate A Opens 10-Point Lead"
+)
+
+# Calculate MOE for Poll 1
+poll1$moe <- 1.96 * sqrt(0.25 / poll1$sample_size) * 100
+poll1$difference <- poll1$candidate_a - poll1$candidate_b
+poll1$is_statistical_tie <- poll1$difference < (2 * poll1$moe)
+
+# Poll 2: Statewide Initiative
+poll2 <- list(
+  name = "Ballot Initiative Poll",
+  sample_size = 1500,
+  method = "Live caller, cell + landline",
+  support = 53,
+  oppose = 47,
+  headline = "Voters Favor Initiative"
+)
+
+# Calculate MOE for Poll 2
+poll2$moe <- 1.96 * sqrt(0.25 / poll2$sample_size) * 100
+poll2$difference <- poll2$support - poll2$oppose
+poll2$is_statistical_tie <- poll2$difference < (2 * poll2$moe)
+
+# Compare
+cat("POLL 1:", poll1$name, "\n")
+cat("Sample size:", poll1$sample_size, "\n")
+cat("Margin of error: ±", round(poll1$moe, 1), "percentage points\n")
+cat("Reported difference:", poll1$difference, "points\n")
+cat("Statistical tie?", poll1$is_statistical_tie, "\n\n")
+
+cat("POLL 2:", poll2$name, "\n")
+cat("Sample size:", poll2$sample_size, "\n")
+cat("Margin of error: ±", round(poll2$moe, 1), "percentage points\n")
+cat("Reported difference:", poll2$difference, "points\n")
+cat("Statistical tie?", poll2$is_statistical_tie, "\n")
+```
+
+### Reflection Question 5:
+- Which poll has a larger margin of error?
+- Which headline is more accurate given the margin of error?
+- Poll 1 used an "online panel" while Poll 2 used "live caller, cell + landline." Why might this matter?
+- How would you rewrite Poll 1's headline to be more accurate?
+
+PUT ANSWER HERE
+
+## Task 6: Tracking Polls Over Time
+
+A candidate's approval rating has been tracked monthly. Is it actually changing, or just normal variation?
+
+```{r}
+# Monthly approval ratings (sample size = 1000 each month)
+approval_data <- tibble(
+  month = c("Jan", "Feb", "Mar", "Apr", "May", "Jun"),
+  approval = c(45, 48, 46, 49, 47, 51),
+  sample_size = 1000
+)
+
+# Calculate MOE
+approval_data <- approval_data |>
+  mutate(
+    moe = 1.96 * sqrt((approval/100) * (1 - approval/100) / sample_size) * 100,
+    lower_bound = approval - moe,
+    upper_bound = approval + moe
+  )
+
+approval_data
+
+# Visualize with error bars
+ggplot(approval_data, aes(x = month, y = approval)) +
+  geom_line(group = 1, color = "darkblue", size = 1) +
+  geom_point(size = 3, color = "darkblue") +
+  geom_errorbar(aes(ymin = lower_bound, ymax = upper_bound),
+                width = 0.2, color = "darkblue", alpha = 0.5) +
+  geom_hline(yintercept = mean(approval_data$approval),
+             linetype = "dashed", color = "red") +
+  labs(
+    title = "Approval Rating Over Time (with Margin of Error)",
+    subtitle = "Error bars show 95% confidence intervals",
+    x = "Month",
+    y = "Approval Rating (%)"
+  ) +
+  theme_minimal()
+```
+
+### Reflection Question 6:
+- Looking at the error bars, do they all overlap?
+- Is the June rating (51%) significantly higher than the January rating (45%)?
+- Write a sentence describing this trend that accounts for margin of error.
+- Why is it misleading to write "approval rating jumped 2 points this month" without mentioning margin of error?
+
+PUT ANSWER HERE
+
+## Task 7: The Real-World Example
+
+You're covering a Senate race. Three different polling organizations released polls this week with different results:
+
+```{r}
+# Three polls from different organizations
+senate_polls <- tibble(
+  pollster = c("University Poll", "Media Company Poll", "Partisan Firm Poll"),
+  sample_size = c(1100, 750, 500),
+  method = c("Live caller", "Online panel", "Automated calls"),
+  candidate_x = c(48, 51, 54),
+  candidate_y = c(47, 45, 42)
+)
+
+# Calculate MOE and whether X is ahead
+senate_polls <- senate_polls |>
+  mutate(
+    moe = 1.96 * sqrt(0.25 / sample_size) * 100,
+    difference = candidate_x - candidate_y,
+    x_leads_significantly = difference > (2 * moe)
+  )
+
+senate_polls
+
+# Visualize
+ggplot(senate_polls, aes(x = pollster, y = candidate_x)) +
+  geom_point(aes(color = "Candidate X"), size = 4) +
+  geom_point(aes(y = candidate_y, color = "Candidate Y"), size = 4) +
+  geom_errorbar(aes(ymin = candidate_x - moe, ymax = candidate_x + moe),
+                width = 0.2, alpha = 0.5) +
+  geom_errorbar(aes(ymin = candidate_y - moe, ymax = candidate_y + moe),
+                width = 0.2, alpha = 0.5) +
+  scale_color_manual(values = c("Candidate X" = "blue", "Candidate Y" = "red")) +
+  labs(
+    title = "Three Polls Show Different Results",
+    subtitle = "Error bars show margin of error",
+    x = NULL,
+    y = "Support (%)",
+    color = NULL
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom",
+        axis.text.x = element_text(angle = 45, hjust = 1))
+```
+
+### Reflection Question 7:
+- Which poll has the largest margin of error? Why?
+- In which poll(s) does Candidate X lead outside the margin of error?
+- The Partisan Firm Poll shows a 12-point lead. Should you lead your story with this finding? Why or why not?
+- When multiple polls show different results, how should a journalist handle this in their reporting?
+
+PUT ANSWER HERE
+
+## Task 8: Writing the Story
+
+Using the polls from Task 7, write a lead paragraph that:
+1. Reports the range of results
+2. Mentions margins of error
+3. Avoids overstating certainty
+4. Is still clear and readable
+
+**Your lead paragraph:**
+
+PUT ANSWER HERE
+
+## Task 9: Evaluating Poll Quality Checklist
+
+A press release claims: "New poll shows overwhelming support for ballot measure—68% in favor!"
+
+Before reporting this, what questions would you ask? Fill in the following checklist:
+
+```{r}
+# Create a polling evaluation checklist
+checklist <- tibble(
+  question = c(
+    "What was the sample size?",
+    "What was the margin of error?",
+    "How were respondents selected?",
+    "When was the poll conducted?",
+    "What was the response rate?",
+    "Who paid for the poll?",
+    "What was the exact question wording?",
+    "Were results weighted? How?"
+  ),
+  answer = c(
+    "FILL IN",
+    "FILL IN",
+    "FILL IN",
+    "FILL IN",
+    "FILL IN",
+    "FILL IN",
+    "FILL IN",
+    "FILL IN"
+  ),
+  why_it_matters = c(
+    "Affects margin of error",
+    "Indicates precision of results",
+    "Random samples are more reliable",
+    "Recent polls are more relevant",
+    "Low response rates may indicate bias",
+    "May reveal conflicts of interest",
+    "Wording can dramatically affect results",
+    "Weighting affects final results"
+  )
+)
+
+checklist
+```
+
+### Reflection Question 8:
+Imagine the polling organization responds with:
+- Sample size: 400
+- Method: Online opt-in panel
+- Question: "Do you support the common-sense ballot measure to improve our community?"
+- Sponsor: Political action committee supporting the measure
+
+Would you report this poll? What red flags do you see? What would you include in your story?
+
+PUT ANSWER HERE
+
+## Key Takeaways
+
+1. **Margin of error indicates uncertainty**: It's not a single number but a range
+
+2. **Larger samples = smaller MOE**: But doubling the sample only reduces MOE by about 30%
+
+3. **Statistical tie**: When difference < 2 × MOE, it's too close to call
+
+4. **Subgroups have larger MOE**: Be cautious with demographic breakdowns
+
+5. **Not all polls are equal**: Sample size, methodology, and sponsor all matter
+
+6. **Always report MOE**: Readers need context to interpret poll results
+
+## Final Reflection
+
+### Reflection Question 9:
+Find a recent news article that reports polling results. Evaluate it:
+- Does it mention margin of error?
+- Does it mention sample size?
+- Does it explain methodology?
+- Does the headline overstate certainty?
+- If you were editing this article, what would you change?
+
+PUT ANSWER HERE
+
+When finished, save your work, switch to GitHub Desktop, then add, commit and push your changes to GitHub and submit the URL of the notebook in ELMS.
