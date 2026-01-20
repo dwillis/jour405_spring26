@@ -1,0 +1,362 @@
+---
+title: "HW10: Polling Fundamentals & Margin of Error"
+name: REPLACE WITH YOUR NAME
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+```
+
+## Introduction: Why Journalists Need to Understand Polls
+
+Polls are everywhere in journalism - election coverage, approval ratings, policy questions, consumer confidence. But polls are frequently misreported. Headlines like "Candidate A Leads by 2 Points!" often ignore that the margin of error makes such a lead meaningless.
+
+In this assignment, you'll work with real polling data from FiveThirtyEight's COVID-19 approval polls to learn:
+- How to calculate margin of error
+- Why sample size matters (and why most polls use ~1,000 respondents)
+- When poll differences are meaningful vs. statistical noise
+- How to write accurate headlines about polling data
+
+## The Data: COVID-19 Approval Polls
+
+We'll use FiveThirtyEight's collection of polls asking Americans whether they approved of how various leaders handled COVID-19. This dataset includes polls from many different pollsters with varying sample sizes - perfect for understanding margin of error.
+
+```{r load-data}
+# Load the COVID approval polls data
+covid_polls <- read_csv("https://raw.githubusercontent.com/fivethirtyeight/covid-19-polls/master/covid_approval_polls.csv")
+
+# Take a first look
+glimpse(covid_polls)
+```
+
+## Task 1: Explore the Data (2 points)
+
+Let's examine the polling data to understand what we're working with.
+
+```{r explore-data}
+# Filter to just the "all" party (overall population, not partisan subgroups)
+# and polls about Trump's handling of COVID
+national_polls <- covid_polls |>
+  filter(party == "all", subject == "Trump") |>
+  select(start_date, end_date, pollster, sample_size, population, approve, disapprove, url)
+
+# How many polls do we have?
+cat("Number of national polls:", nrow(national_polls), "\n")
+
+# Look at the range of sample sizes
+national_polls |>
+  summarize(
+    min_sample = min(sample_size, na.rm = TRUE),
+    max_sample = max(sample_size, na.rm = TRUE),
+    median_sample = median(sample_size, na.rm = TRUE),
+    mean_sample = mean(sample_size, na.rm = TRUE)
+  )
+```
+
+### Reflection Question 1:
+Look at the range of sample sizes. What's the smallest sample? The largest? Why do you think there's such variation in how many people different pollsters survey?
+
+ANSWER HERE
+
+
+## Task 2: Understanding Margin of Error (5 points)
+
+The **margin of error (MOE)** tells us how much a poll result might differ from the true population value due to random sampling. 
+
+For a proportion (like approval percentage), the formula is:
+
+$$MOE = z \times \sqrt{\frac{p(1-p)}{n}}$$
+
+Where:
+- z = 1.96 for 95% confidence
+- p = the proportion (we use 0.5 as the worst case - maximum uncertainty)
+- n = sample size
+
+For journalism purposes, we can simplify this to:
+
+$$MOE = \frac{1}{\sqrt{n}} \times 100$$
+
+This gives us the MOE in percentage points for a 95% confidence level.
+
+Let's calculate MOE for our polls:
+
+```{r calculate-moe}
+# Calculate margin of error for each poll
+national_polls <- national_polls |>
+  filter(!is.na(sample_size)) |>
+  mutate(
+    # Full formula (using 0.5 for maximum MOE)
+    moe = 1.96 * sqrt(0.5 * 0.5 / sample_size) * 100,
+    # Simplified formula (same result when p = 0.5)
+    moe_simple = (1 / sqrt(sample_size)) * 100
+  )
+
+# Look at the relationship between sample size and MOE
+national_polls |>
+  select(pollster, sample_size, moe) |>
+  arrange(sample_size) |>
+  head(10)
+```
+
+Now fill in the REPLACE_ME to see polls with the largest samples:
+
+```{r large-samples}
+# Look at polls with largest sample sizes
+national_polls |>
+  select(pollster, sample_size, moe) |>
+  arrange(desc(REPLACE_ME)) |>
+  head(10)
+```
+
+### Reflection Question 2:
+Compare the MOE for the smallest and largest sample sizes. A poll with n=400 has an MOE of about ±5%. A poll with n=1,600 has an MOE of about ±2.5%. To cut the MOE in *half*, how many times larger does the sample need to be? What does this tell you about why most polls don't survey 10,000+ people?
+
+ANSWER HERE
+
+
+## Task 3: The Sample Size Sweet Spot (3 points)
+
+Let's visualize why most professional polls use around 1,000 respondents.
+
+```{r sample-size-visualization}
+# Create a dataset showing how MOE changes with sample size
+sample_sizes <- tibble(
+  n = seq(100, 3000, by = 50)
+) |>
+  mutate(
+    moe = (1 / sqrt(n)) * 100
+  )
+
+# Plot the relationship
+ggplot(sample_sizes, aes(x = n, y = moe)) +
+  geom_line(color = "steelblue", size = 1) +
+  geom_hline(yintercept = 3, linetype = "dashed", color = "red") +
+  geom_vline(xintercept = 1000, linetype = "dashed", color = "darkgreen") +
+  annotate("text", x = 1100, y = 3.5, label = "n = 1,000\nMOE ≈ ±3%", 
+           hjust = 0, color = "darkgreen") +
+  annotate("text", x = 2200, y = 3.2, label = "Industry standard: ±3%", 
+           color = "red") +
+  labs(
+    title = "The Diminishing Returns of Larger Sample Sizes",
+    subtitle = "Doubling the sample only reduces MOE by ~30%",
+    x = "Sample Size (n)",
+    y = "Margin of Error (± percentage points)"
+  ) +
+  theme_minimal() +
+  scale_x_continuous(breaks = seq(0, 3000, by = 500))
+```
+
+### Reflection Question 3:
+Based on this graph, explain to a non-statistical audience why a poll of 1,000 people can reasonably represent 330 million Americans. Why don't pollsters just survey 10,000 people to be "more accurate"?
+
+ANSWER HERE
+
+
+## Task 4: Comparing Polls - When Differences Matter (5 points)
+
+Here's where margin of error becomes crucial for journalists. Let's look at polls conducted around the same time and see if their differences are meaningful.
+
+```{r compare-polls}
+# Find polls from a specific time period (March 2020)
+march_polls <- national_polls |>
+  filter(start_date >= "2020-03-15", start_date <= "2020-03-31") |>
+  select(start_date, pollster, sample_size, approve, disapprove, moe) |>
+  arrange(start_date)
+
+march_polls
+```
+
+```{r poll-comparison}
+# Calculate the range of approval ratings
+march_summary <- march_polls |>
+  summarize(
+    n_polls = n(),
+    min_approve = min(approve, na.rm = TRUE),
+    max_approve = max(approve, na.rm = TRUE),
+    range = max_approve - min_approve,
+    avg_moe = mean(moe, na.rm = TRUE)
+  )
+
+march_summary
+```
+
+To determine if two polls are *significantly different*, we need to check if their confidence intervals overlap. A rough rule: two polls are significantly different if their results differ by more than the sum of their MOEs.
+
+```{r significant-difference}
+# Let's compare two specific polls
+# Find the highest and lowest approval polls from March
+highest_poll <- march_polls |> filter(approve == max(approve, na.rm = TRUE)) |> slice(1)
+lowest_poll <- march_polls |> filter(approve == min(approve, na.rm = TRUE)) |> slice(1)
+
+cat("Highest approval poll:\n")
+cat("  Pollster:", highest_poll$pollster, "\n")
+cat("  Approval:", highest_poll$approve, "%\n")
+cat("  MOE: ±", round(highest_poll$moe, 1), "%\n")
+cat("  Confidence interval:", round(highest_poll$approve - highest_poll$moe, 1), "% to", 
+    round(highest_poll$approve + highest_poll$moe, 1), "%\n\n")
+
+cat("Lowest approval poll:\n")
+cat("  Pollster:", lowest_poll$pollster, "\n")
+cat("  Approval:", lowest_poll$approve, "%\n")
+cat("  MOE: ±", round(lowest_poll$moe, 1), "%\n")
+cat("  Confidence interval:", round(lowest_poll$approve - lowest_poll$moe, 1), "% to", 
+    round(lowest_poll$approve + lowest_poll$moe, 1), "%\n\n")
+
+# Calculate the difference
+diff <- highest_poll$approve - lowest_poll$approve
+combined_moe <- highest_poll$moe + lowest_poll$moe
+
+cat("Difference between polls:", diff, "percentage points\n")
+cat("Combined MOE:", round(combined_moe, 1), "percentage points\n")
+cat("Is the difference significant? ", ifelse(diff > combined_moe, "YES", "NO"), "\n")
+```
+
+### Reflection Question 4:
+Two polls from the same week show different approval ratings. Based on the confidence intervals, are these polls actually contradicting each other, or could both be accurate snapshots of public opinion? How would you explain this to your editor?
+
+ANSWER HERE
+
+
+## Task 5: Visualizing Uncertainty (3 points)
+
+Let's create a visualization that shows polls WITH their margins of error - the way responsible journalists should think about poll results.
+
+```{r visualize-uncertainty}
+# Take a sample of polls to visualize
+sample_polls <- national_polls |>
+  filter(!is.na(approve), !is.na(moe)) |>
+  arrange(start_date) |>
+  slice(seq(1, n(), by = 10)) |>  # Take every 10th poll to reduce clutter
+  head(20)
+
+# Create the visualization
+ggplot(sample_polls, aes(x = start_date, y = approve)) +
+  geom_errorbar(aes(ymin = approve - moe, ymax = approve + moe), 
+                width = 2, color = "gray50", alpha = 0.7) +
+  geom_point(aes(size = sample_size), color = "steelblue") +
+  geom_hline(yintercept = 50, linetype = "dashed", color = "red", alpha = 0.5) +
+  labs(
+    title = "COVID-19 Approval Polls with Margins of Error",
+    subtitle = "Error bars show 95% confidence intervals; point size indicates sample size",
+    x = "Poll Date",
+    y = "Approval (%)",
+    size = "Sample Size"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+### Reflection Question 5:
+Look at this visualization. How does showing the error bars change your interpretation of the trend compared to just plotting the points? Why is it misleading to report poll results without mentioning the margin of error?
+
+ANSWER HERE
+
+
+## Task 6: Writing Accurate Headlines (5 points)
+
+Now let's practice writing headlines that accurately reflect polling uncertainty.
+
+```{r headline-practice}
+# Here are two hypothetical polls from the same week:
+poll_a <- tibble(
+  pollster = "Poll A",
+  approve = 48,
+  disapprove = 47,
+  sample_size = 1000,
+  moe = (1/sqrt(1000)) * 100
+)
+
+poll_b <- tibble(
+  pollster = "Poll B", 
+  approve = 44,
+  disapprove = 52,
+  sample_size = 800,
+  moe = (1/sqrt(800)) * 100
+)
+
+# Display both polls
+bind_rows(poll_a, poll_b) |>
+  mutate(
+    approve_range = paste0(round(approve - moe, 1), "% - ", round(approve + moe, 1), "%"),
+    moe = round(moe, 1)
+  ) |>
+  select(pollster, approve, disapprove, sample_size, moe, approve_range)
+```
+
+### Reflection Question 6:
+For each scenario below, write a headline and explain whether it's accurate:
+
+**Scenario A:** A news outlet writes: "Poll Shows Approval at 48%, Higher Than Last Week's 44%"
+
+Is this headline accurate given the margins of error? Write a better headline:
+
+YOUR HEADLINE:
+EXPLANATION:
+
+
+**Scenario B:** Using Poll A alone (48% approve, 47% disapprove, MOE ±3.2%)
+
+A news outlet writes: "President Leads in Approval Rating"
+
+Is this headline accurate? Write a better headline:
+
+YOUR HEADLINE:
+EXPLANATION:
+
+
+## Task 7: Calculate Your Own MOE (2 points)
+
+Your editor sends you results from a local poll with the following information:
+- Sample size: 625 registered voters
+- 52% support a new transit measure
+- 41% oppose
+- 7% undecided
+
+Calculate the margin of error and determine if supporters have a statistically significant lead over opponents.
+
+```{r your-calculation}
+# Fill in the values
+local_poll_n <- REPLACE_ME
+support <- REPLACE_ME
+oppose <- REPLACE_ME
+
+# Calculate MOE
+local_moe <- (1 / sqrt(REPLACE_ME)) * 100
+
+cat("Margin of Error: ±", round(local_moe, 1), "%\n")
+cat("Support confidence interval:", round(support - local_moe, 1), "% to", 
+    round(support + local_moe, 1), "%\n")
+cat("Oppose confidence interval:", round(oppose - local_moe, 1), "% to", 
+    round(oppose + local_moe, 1), "%\n")
+
+# Check if the lead is significant
+lead <- support - oppose
+cat("\nLead:", lead, "percentage points\n")
+cat("Is lead greater than 2 × MOE?", ifelse(lead > 2 * local_moe, "YES - Significant lead", "NO - Within margin of error"), "\n")
+```
+
+### Reflection Question 7:
+Based on your calculations, write a one-sentence summary of this poll that accurately reflects the uncertainty. Would you say the transit measure is "winning" or "ahead"?
+
+ANSWER HERE
+
+
+## Summary: Key Takeaways for Journalists
+
+After completing this assignment, you should remember:
+
+1. **The MOE Formula**: MOE ≈ 1/√n × 100 (for 95% confidence)
+
+2. **The ~1,000 Rule**: Most polls use ~1,000 respondents because it gives ±3% MOE at reasonable cost
+
+3. **Diminishing Returns**: Doubling sample size only reduces MOE by ~30%
+
+4. **Comparing Polls**: Two polls are only meaningfully different if their gap exceeds the combined MOE
+
+5. **Statistical Ties**: When the difference between options is less than 2× the MOE, it's a statistical tie
+
+6. **Always Report MOE**: Responsible journalism includes the margin of error in poll coverage
+
+
+When finished, save your work and submit via GitHub.
