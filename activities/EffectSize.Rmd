@@ -1,0 +1,329 @@
+---
+title: "Effect Size: Measuring How Much Something Matters"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## Introduction
+
+Statistical significance tells us whether an effect *exists*, but effect size tells us whether it *matters*. As journalists, we need both pieces of information to tell accurate stories.
+
+**The Problem with P-values Alone:**
+
+Imagine two headlines:
+1. "New Drug Shows Statistically Significant Weight Loss (p < 0.001)"
+2. "New Drug Helps Patients Lose Half a Pound Over Six Months"
+
+Both could describe the same study! The first emphasizes statistical significance; the second emphasizes practical importance. Effect size helps us bridge this gap.
+
+## Step 1: Load Required Libraries
+
+```{r}
+library(tidyverse)
+```
+
+## Step 2: Understanding Cohen's d
+
+**Cohen's d** is the most common measure of effect size for comparing means. It tells us how many standard deviations apart two means are.
+
+$$d = \frac{\text{Mean}_1 - \text{Mean}_2}{\text{Standard Deviation}}$$
+
+**Interpreting Cohen's d:**
+
+| Cohen's d | Effect Size | What It Means |
+|-----------|-------------|---------------|
+| d < 0.2   | Negligible  | Practically no meaningful difference |
+| d ≈ 0.2   | Small       | Real but might not be noticeable |
+| d ≈ 0.5   | Medium      | Noticeable and potentially meaningful |
+| d ≈ 0.8   | Large       | Substantial, obvious difference |
+| d > 1.0   | Very Large  | Dramatic difference |
+
+## Step 3: A Real-World Example
+
+**Scenario:** Two coffee shops claim their new brewing method produces "significantly hotter" coffee. Let's investigate both claims.
+
+```{r}
+# Coffee Shop A: Small sample, big temperature difference
+shop_a_old <- c(158, 162, 155, 160, 157)  # Old method temperatures (°F)
+shop_a_new <- c(172, 175, 168, 174, 171)  # New method temperatures (°F)
+
+# Coffee Shop B: Large sample, small temperature difference
+set.seed(42)  # For reproducibility
+shop_b_old <- rnorm(200, mean = 160, sd = 5)  # Old method
+shop_b_new <- rnorm(200, mean = 161, sd = 5)  # New method (only 1°F higher)
+
+# Create data frames
+shop_a_data <- tibble(
+  method = c(rep("Old", 5), rep("New", 5)),
+  temperature = c(shop_a_old, shop_a_new)
+)
+
+shop_b_data <- tibble(
+  method = c(rep("Old", 200), rep("New", 200)),
+  temperature = c(shop_b_old, shop_b_new)
+)
+```
+
+## Step 4: Calculate Summary Statistics
+
+```{r}
+# Shop A statistics
+shop_a_stats <- shop_a_data |>
+  group_by(method) |>
+  summarize(
+    mean_temp = mean(temperature),
+    sd_temp = sd(temperature),
+    n = n()
+  )
+
+shop_a_stats
+
+# Shop B statistics
+shop_b_stats <- shop_b_data |>
+  group_by(method) |>
+  summarize(
+    mean_temp = mean(temperature),
+    sd_temp = sd(temperature),
+    n = n()
+  )
+
+shop_b_stats
+```
+
+## Step 5: Run Hypothesis Tests
+
+```{r}
+# Shop A t-test
+shop_a_ttest <- t.test(temperature ~ method, data = shop_a_data)
+cat("Shop A Results:\n")
+shop_a_ttest
+
+# Shop B t-test
+shop_b_ttest <- t.test(temperature ~ method, data = shop_b_data)
+cat("\nShop B Results:\n")
+shop_b_ttest
+```
+
+**Key Observation:** Both tests might show statistical significance, but look at the actual temperature differences!
+
+## Step 6: Calculate Effect Size (Cohen's d)
+
+```{r}
+# Function to calculate Cohen's d
+calculate_cohens_d <- function(group1, group2) {
+  mean_diff <- mean(group1) - mean(group2)
+  pooled_sd <- sqrt((sd(group1)^2 + sd(group2)^2) / 2)
+  d <- mean_diff / pooled_sd
+  return(d)
+}
+
+# Shop A Cohen's d
+shop_a_cohens_d <- calculate_cohens_d(
+  shop_a_data$temperature[shop_a_data$method == "New"],
+  shop_a_data$temperature[shop_a_data$method == "Old"]
+)
+
+# Shop B Cohen's d
+shop_b_cohens_d <- calculate_cohens_d(
+  shop_b_data$temperature[shop_b_data$method == "New"],
+  shop_b_data$temperature[shop_b_data$method == "Old"]
+)
+
+cat("Shop A Cohen's d:", round(shop_a_cohens_d, 3), "\n")
+cat("Shop B Cohen's d:", round(shop_b_cohens_d, 3), "\n")
+```
+
+## Step 7: Interpret Effect Sizes
+
+```{r}
+# Function to categorize effect size
+categorize_effect <- function(d) {
+  d <- abs(d)
+  case_when(
+    d < 0.2 ~ "Negligible",
+    d < 0.5 ~ "Small",
+    d < 0.8 ~ "Medium",
+    d < 1.0 ~ "Large",
+    TRUE ~ "Very Large"
+  )
+}
+
+# Create comparison table
+comparison <- tibble(
+  Shop = c("Shop A", "Shop B"),
+  Sample_Size = c(10, 400),
+  Mean_Difference = c(
+    round(mean(shop_a_new) - mean(shop_a_old), 1),
+    round(mean(shop_b_new) - mean(shop_b_old), 1)
+  ),
+  P_Value = c(
+    format(shop_a_ttest$p.value, scientific = FALSE, digits = 4),
+    format(shop_b_ttest$p.value, scientific = FALSE, digits = 4)
+  ),
+  Significant = c(
+    ifelse(shop_a_ttest$p.value < 0.05, "Yes", "No"),
+    ifelse(shop_b_ttest$p.value < 0.05, "Yes", "No")
+  ),
+  Cohens_d = c(round(shop_a_cohens_d, 3), round(shop_b_cohens_d, 3)),
+  Effect_Category = c(
+    categorize_effect(shop_a_cohens_d),
+    categorize_effect(shop_b_cohens_d)
+  )
+)
+
+knitr::kable(comparison, caption = "Comparing Statistical Significance vs. Effect Size")
+```
+
+## Step 8: Visualize the Comparison
+
+```{r}
+# Shop A visualization
+p1 <- ggplot(shop_a_data, aes(x = method, y = temperature, fill = method)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.1, size = 3, alpha = 0.7) +
+  scale_fill_manual(values = c("Old" = "coral", "New" = "steelblue")) +
+  labs(
+    title = "Shop A: Large Effect Size",
+    subtitle = paste("Cohen's d =", round(shop_a_cohens_d, 2), "(Very Large Effect)"),
+    x = "Brewing Method",
+    y = "Temperature (°F)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Shop B visualization
+p2 <- ggplot(shop_b_data, aes(x = method, y = temperature, fill = method)) +
+  geom_boxplot(alpha = 0.7) +
+  scale_fill_manual(values = c("Old" = "coral", "New" = "steelblue")) +
+  labs(
+    title = "Shop B: Negligible Effect Size",
+    subtitle = paste("Cohen's d =", round(shop_b_cohens_d, 2), "(Negligible Effect)"),
+    x = "Brewing Method",
+    y = "Temperature (°F)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+
+# Display plots
+p1
+p2
+```
+
+## Step 9: Why This Matters for Journalists
+
+```{r}
+# Create a story comparison
+story_comparison <- tibble(
+  Approach = c("P-Value Only (Shop B)", "Effect Size Included (Shop B)"),
+  Headline = c(
+    "New Brewing Method Produces Significantly Hotter Coffee (p < 0.05)",
+    "New Brewing Method Adds Just 1 Degree to Your Cup"
+  ),
+  Accurate = c("Technically Yes", "Yes"),
+  Helpful = c("No - Misleading", "Yes - Informative")
+)
+
+knitr::kable(story_comparison, caption = "How Reporting Approach Changes the Story")
+```
+
+## Step 10: Another Example - Salary Differences
+
+Let's examine gender pay gaps in a hypothetical company.
+
+```{r}
+# Create salary data
+set.seed(123)
+salary_data <- tibble(
+  gender = c(rep("Men", 150), rep("Women", 150)),
+  salary = c(
+    rnorm(150, mean = 72000, sd = 15000),  # Men's salaries
+    rnorm(150, mean = 68000, sd = 14000)   # Women's salaries
+  )
+)
+
+# Summary statistics
+salary_stats <- salary_data |>
+  group_by(gender) |>
+  summarize(
+    mean_salary = mean(salary),
+    sd_salary = sd(salary),
+    n = n()
+  )
+
+salary_stats
+```
+
+```{r}
+# Hypothesis test
+salary_ttest <- t.test(salary ~ gender, data = salary_data)
+salary_ttest
+
+# Calculate Cohen's d
+salary_cohens_d <- calculate_cohens_d(
+  salary_data$salary[salary_data$gender == "Men"],
+  salary_data$salary[salary_data$gender == "Women"]
+)
+
+cat("\nCohen's d for salary gap:", round(salary_cohens_d, 3))
+cat("\nEffect category:", categorize_effect(salary_cohens_d))
+```
+
+```{r}
+# Visualize salary distributions
+ggplot(salary_data, aes(x = salary, fill = gender)) +
+  geom_density(alpha = 0.5) +
+  geom_vline(data = salary_stats, aes(xintercept = mean_salary, color = gender),
+             linetype = "dashed", size = 1) +
+  scale_fill_manual(values = c("Men" = "steelblue", "Women" = "coral")) +
+  scale_color_manual(values = c("Men" = "steelblue", "Women" = "coral")) +
+  scale_x_continuous(labels = scales::dollar_format()) +
+  labs(
+    title = "Salary Distribution by Gender",
+    subtitle = paste("Difference:", scales::dollar(mean(salary_data$salary[salary_data$gender == "Men"]) -
+                                                    mean(salary_data$salary[salary_data$gender == "Women"])),
+                     "| Cohen's d =", round(salary_cohens_d, 2)),
+    x = "Annual Salary",
+    y = "Density",
+    fill = "Gender"
+  ) +
+  theme_minimal() +
+  guides(color = "none")
+```
+
+## Conclusion: The Complete Picture
+
+When reporting on statistical findings, always ask:
+
+1. **Is it statistically significant?** (p-value < 0.05)
+2. **How big is the effect?** (Cohen's d)
+3. **Does the effect matter in the real world?** (Context)
+
+```{r}
+# Summary table of what we learned
+summary_table <- tibble(
+  Question = c(
+    "What does p-value tell us?",
+    "What does effect size tell us?",
+    "Can we have significance without a meaningful effect?",
+    "Can we have a meaningful effect without significance?"
+  ),
+  Answer = c(
+    "Whether the result is unlikely to occur by chance",
+    "How large/meaningful the difference actually is",
+    "Yes - with large samples, tiny differences can be significant",
+    "Yes - with small samples, real effects might not reach significance"
+  )
+)
+
+knitr::kable(summary_table, caption = "Key Takeaways About P-values vs. Effect Size")
+```
+
+**For Journalists:** Always report both the statistical significance AND the actual magnitude of the effect. Your readers deserve to know not just that something is "significant," but whether it actually matters.

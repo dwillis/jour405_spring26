@@ -1,0 +1,337 @@
+---
+title: "HW19: Effect Size - Campaign Spending and Voter Turnout"
+name: REPLACE WITH YOUR NAME
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+```
+
+## Introduction
+
+Two political action committees (PACs) are claiming their get-out-the-vote campaigns were successful in increasing voter turnout in the 2024 election. Both PACs released press statements citing "statistically significant" increases in turnout.
+
+As a political reporter, your editor wants you to dig deeper: **Just because something is statistically significant, does it mean it actually mattered?**
+
+This is where effect size comes in. In this assignment, you'll analyze turnout data from both campaigns and determine which one actually made a meaningful difference.
+
+## Background Data
+
+**PAC A ("Vote Local"):**
+- Operated in 15 precincts with intense door-to-door canvassing
+- Previous election turnout in these precincts: 42.3% (SD = 8.5%)
+- Current election turnout data collected from all 15 precincts
+
+**PAC B ("Digital Democracy"):**
+- Ran targeted social media ads across 500 precincts
+- Previous election turnout in these precincts: 42.3% (SD = 8.5%)
+- Current election turnout: 43.1% average (SD = 9.2%)
+
+
+## Task 1: Set Up the Data (3 points)
+
+Fill in the REPLACE_ME values based on the background information.
+
+```{r}
+# Baseline (previous election) statistics
+prior_turnout_mean <- REPLACE_ME  # Previous turnout percentage
+prior_turnout_sd <- REPLACE_ME    # Standard deviation
+
+# PAC A data (15 precincts with door-to-door canvassing)
+pac_a_turnout <- c(
+  48.2, 51.3, 47.8, 49.5, 52.1,
+  46.9, 50.4, 48.7, 51.8, 47.2,
+  49.1, 50.8, 48.5, 52.4, 49.9
+)
+
+# Create PAC A tibble
+pac_a_data <- tibble(
+  precinct = paste("Precinct", 1:15),
+  turnout = pac_a_turnout
+)
+
+# PAC B summary statistics (we only have aggregated data)
+pac_b_new_mean <- REPLACE_ME   # From background: 43.1%
+pac_b_new_sd <- REPLACE_ME     # From background: 9.2%
+pac_b_n <- REPLACE_ME          # From background: 500 precincts
+
+# View PAC A data
+pac_a_data
+```
+
+### Reflection Question 1:
+Before doing any calculations, look at PAC A's raw turnout numbers. How do they compare to the previous election average of 42.3%? What's your initial impression?
+
+ANSWER HERE
+
+
+## Task 2: Calculate Summary Statistics (3 points)
+
+```{r}
+# Calculate PAC A statistics
+pac_a_stats <- pac_a_data |>
+  summarize(
+    mean_turnout = mean(REPLACE_ME),
+    sd_turnout = sd(REPLACE_ME),
+    n = n(),
+    improvement = mean_turnout - prior_turnout_mean
+  )
+
+pac_a_stats
+
+# Calculate PAC B improvement
+pac_b_improvement <- pac_b_new_mean - prior_turnout_mean
+
+cat("\nPAC A improvement:", round(pac_a_stats$improvement, 2), "percentage points\n")
+cat("PAC B improvement:", round(pac_b_improvement, 2), "percentage points\n")
+```
+
+### Reflection Question 2:
+Which PAC shows a larger raw improvement in turnout? Does this necessarily mean their campaign was more effective?
+
+ANSWER HERE
+
+
+## Task 3: Run Hypothesis Tests (4 points)
+
+Let's test whether each PAC's improvement is statistically significant.
+
+```{r}
+# PAC A: One-sample t-test
+pac_a_ttest <- t.test(
+  pac_a_data$turnout,
+  mu = prior_turnout_mean,
+  alternative = "greater"
+)
+
+cat("PAC A Hypothesis Test Results:\n")
+pac_a_ttest
+```
+
+```{r}
+# PAC B: Manual calculation (we only have summary stats)
+# t = (sample_mean - population_mean) / (sample_sd / sqrt(n))
+
+pac_b_t_stat <- (pac_b_new_mean - prior_turnout_mean) / (pac_b_new_sd / sqrt(REPLACE_ME))
+pac_b_p_value <- pt(pac_b_t_stat, df = pac_b_n - 1, lower.tail = FALSE)
+
+cat("PAC B Hypothesis Test Results:\n")
+cat("t-statistic:", round(pac_b_t_stat, 4), "\n")
+cat("p-value:", format(pac_b_p_value, scientific = FALSE, digits = 6), "\n")
+```
+
+### Reflection Question 3:
+Based on p-values alone (using α = 0.05), which campaign(s) showed "statistically significant" results? If you were writing a headline based only on p-values, what would it say?
+
+ANSWER HERE
+
+
+## Task 4: Calculate Effect Size - Cohen's d (5 points)
+
+Now let's calculate effect size to understand the practical significance of these results.
+
+**Cohen's d formula:**
+$$d = \frac{\text{Mean}_{\text{after}} - \text{Mean}_{\text{before}}}{\text{Standard Deviation}}$$
+
+**Interpretation guide:**
+- d < 0.2: Negligible effect
+- d ≈ 0.2: Small effect
+- d ≈ 0.5: Medium effect
+- d ≈ 0.8: Large effect
+
+```{r}
+# Calculate Cohen's d for PAC A
+pac_a_cohens_d <- (pac_a_stats$mean_turnout - prior_turnout_mean) / prior_turnout_sd
+
+cat("PAC A Cohen's d:", round(pac_a_cohens_d, 3), "\n")
+
+# Calculate Cohen's d for PAC B
+pac_b_cohens_d <- (REPLACE_ME - REPLACE_ME) / prior_turnout_sd
+
+cat("PAC B Cohen's d:", round(pac_b_cohens_d, 3), "\n")
+```
+
+```{r}
+# Function to categorize effect size
+categorize_effect <- function(d) {
+  d <- abs(d)
+  case_when(
+    d < 0.2 ~ "Negligible",
+    d < 0.5 ~ "Small",
+    d < 0.8 ~ "Medium",
+    TRUE ~ "Large"
+  )
+}
+
+cat("\nPAC A effect category:", categorize_effect(pac_a_cohens_d), "\n")
+cat("PAC B effect category:", categorize_effect(pac_b_cohens_d), "\n")
+```
+
+### Reflection Question 4:
+How do the effect sizes compare? Which campaign produced a larger practical effect? Why might a campaign with a larger effect size have a larger p-value?
+
+ANSWER HERE
+
+
+## Task 5: Create a Comparison Table (3 points)
+
+```{r}
+# Build a comprehensive comparison
+comparison_table <- tibble(
+  Metric = c(
+    "Sample Size (precincts)",
+    "Previous Turnout",
+    "New Turnout",
+    "Raw Improvement (pp)",
+    "P-value",
+    "Statistically Significant?",
+    "Cohen's d",
+    "Effect Size Category"
+  ),
+  `PAC A (Door-to-Door)` = c(
+    pac_a_stats$n,
+    paste0(prior_turnout_mean, "%"),
+    paste0(round(pac_a_stats$mean_turnout, 1), "%"),
+    paste0("+", round(pac_a_stats$improvement, 1)),
+    format(pac_a_ttest$p.value, scientific = FALSE, digits = 4),
+    ifelse(pac_a_ttest$p.value < 0.05, "Yes", "No"),
+    round(pac_a_cohens_d, 3),
+    categorize_effect(pac_a_cohens_d)
+  ),
+  `PAC B (Social Media)` = c(
+    pac_b_n,
+    paste0(prior_turnout_mean, "%"),
+    paste0(pac_b_new_mean, "%"),
+    paste0("+", round(pac_b_improvement, 1)),
+    format(pac_b_p_value, scientific = FALSE, digits = 4),
+    ifelse(pac_b_p_value < 0.05, "Yes", "No"),
+    round(pac_b_cohens_d, 3),
+    categorize_effect(pac_b_cohens_d)
+  )
+)
+
+knitr::kable(comparison_table, caption = "Comparing Two Get-Out-The-Vote Campaigns")
+```
+
+### Reflection Question 5:
+Look at the comparison table. PAC B has a much smaller p-value than PAC A, yet PAC A has a much larger effect size. Explain why this apparent contradiction makes sense. What role does sample size play?
+
+ANSWER HERE
+
+
+## Task 6: Visualize the Comparison (4 points)
+
+```{r}
+# Create visualization data
+viz_data <- tibble(
+  Campaign = c("PAC A\n(Door-to-Door)", "PAC B\n(Social Media)"),
+  Improvement = c(pac_a_stats$improvement, pac_b_improvement),
+  Effect_Size = c(pac_a_cohens_d, pac_b_cohens_d),
+  Sample_Size = c(pac_a_stats$n, pac_b_n),
+  Effect_Category = c(categorize_effect(pac_a_cohens_d), categorize_effect(pac_b_cohens_d))
+)
+
+# Create the bar chart
+ggplot(viz_data, aes(x = Campaign, y = Improvement, fill = Effect_Category)) +
+  geom_col(width = 0.6) +
+  geom_text(aes(label = paste0("+", round(Improvement, 1), " pp\n",
+                                "d = ", round(Effect_Size, 2), "\n",
+                                "n = ", Sample_Size)),
+            vjust = -0.3, size = 3.5) +
+  scale_fill_manual(values = c("Negligible" = "gray70",
+                                "Small" = "lightblue",
+                                "Medium" = "steelblue",
+                                "Large" = "darkblue")) +
+  labs(
+    title = "Voter Turnout Improvements by Campaign Type",
+    subtitle = "Raw improvement (percentage points) with effect size annotations",
+    x = NULL,
+    y = "Turnout Improvement (percentage points)",
+    fill = "Effect Size",
+    caption = "pp = percentage points; d = Cohen's d"
+  ) +
+  theme_minimal() +
+  theme(
+    plot.title = element_text(face = "bold", size = 14),
+    legend.position = "bottom"
+  ) +
+  ylim(0, max(viz_data$Improvement) * 1.4)
+```
+
+### Reflection Question 6:
+Based on this visualization, write a caption that accurately describes what readers should take away from this chart.
+
+ANSWER HERE
+
+
+## Task 7: The Journalism Dilemma (5 points)
+
+Both PACs have sent you press releases:
+
+**PAC A's claim:** "Our door-to-door campaign produced nearly an 8 percentage point increase in voter turnout!"
+
+**PAC B's claim:** "Our digital campaign achieved highly statistically significant results (p < 0.001), proving social media advertising works!"
+
+### Reflection Question 7:
+Both claims are technically accurate. But which one is more meaningful to voters? Write a brief paragraph explaining which campaign appears to have been more effective at actually increasing turnout, and why the distinction between statistical and practical significance matters here.
+
+ANSWER HERE
+
+
+## Task 8: Write the Story (5 points)
+
+### Reflection Question 8:
+Write two versions of a headline and lede (first paragraph) for this story:
+
+**Version 1 - If you only reported on statistical significance:**
+
+Headline: ANSWER HERE
+
+Lede: ANSWER HERE
+
+**Version 2 - Incorporating effect size for the full picture:**
+
+Headline: ANSWER HERE
+
+Lede: ANSWER HERE
+
+Which version better serves your readers? Why?
+
+ANSWER HERE
+
+
+## Task 9: Apply to a New Scenario (5 bonus points)
+
+A tutoring company claims their SAT prep course produces "significant score improvements." Here's their data:
+
+- 800 students enrolled
+- Average score before: 1050 (SD = 150)
+- Average score after: 1062 (SD = 145)
+- They report p < 0.01
+
+Calculate the effect size and determine if their marketing claim is justified.
+
+```{r}
+# Fill in the values
+tutoring_prior_mean <- REPLACE_ME
+tutoring_prior_sd <- REPLACE_ME
+tutoring_new_mean <- REPLACE_ME
+tutoring_n <- REPLACE_ME
+
+# Calculate Cohen's d
+tutoring_cohens_d <- (tutoring_new_mean - tutoring_prior_mean) / tutoring_prior_sd
+
+cat("SAT Tutoring Program:\n")
+cat("Score improvement:", tutoring_new_mean - tutoring_prior_mean, "points\n")
+cat("Cohen's d:", round(tutoring_cohens_d, 3), "\n")
+cat("Effect category:", categorize_effect(tutoring_cohens_d), "\n")
+```
+
+### Bonus Reflection:
+The tutoring program costs $2,000 per student. Based on the effect size, is this a worthwhile investment? What questions would you ask the company's spokesperson? How would you report this story?
+
+ANSWER HERE
+
+
+When finished, save your work and submit via GitHub.

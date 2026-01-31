@@ -1,0 +1,246 @@
+---
+title: "Hypothesis Testing: Did Crime Rates Change After a New Policy?"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## Introduction
+
+Hypothesis testing is a statistical method that helps journalists answer questions like "Is this change real, or could it have happened by chance?" In this activity, we'll investigate whether a city's new community policing initiative actually reduced response times to emergency calls.
+
+**The Scenario:** The city of Westbrook implemented a new community policing program in January. The police chief claims that the program has improved emergency response times. Before the program, the average response time was 8.2 minutes with a standard deviation of 1.5 minutes. You've collected data from 20 randomly selected emergency calls after the program started.
+
+## Step 1: Load Required Libraries
+
+```{r}
+library(tidyverse)
+```
+
+## Step 2: Understanding Hypothesis Testing
+
+Before we analyze data, let's understand the framework:
+
+**Null Hypothesis (H₀):** The new program had NO effect on response times. Any difference we see is due to random chance.
+
+**Alternative Hypothesis (H₁):** The new program DID reduce response times. The difference we observe is real.
+
+**Alpha Level (α):** We'll use 0.05, meaning we're willing to accept a 5% chance of being wrong when we reject the null hypothesis.
+
+## Step 3: Create the Dataset
+
+Let's create our dataset of post-program response times.
+
+```{r}
+# Response times (in minutes) after the community policing program
+response_times <- c(
+  7.8, 8.1, 7.5, 7.9, 8.3,
+  7.6, 7.4, 8.0, 7.7, 7.8,
+  8.2, 7.3, 7.9, 7.5, 8.1,
+  7.6, 7.8, 7.4, 7.7, 7.9
+)
+
+# Known baseline (before the program)
+baseline_mean <- 8.2
+baseline_sd <- 1.5
+alpha <- 0.05
+
+# Create a tibble
+response_data <- tibble(
+  call_number = 1:20,
+  response_time = response_times
+)
+
+# View the data
+response_data
+```
+
+## Step 4: Calculate Summary Statistics
+
+```{r}
+# Calculate summary statistics for the new response times
+summary_stats <- response_data |>
+  summarize(
+    sample_size = n(),
+    sample_mean = mean(response_time),
+    sample_sd = sd(response_time),
+    standard_error = sample_sd / sqrt(sample_size),
+    min_time = min(response_time),
+    max_time = max(response_time)
+  )
+
+summary_stats
+```
+
+**Key Observations:**
+- Sample mean: `r round(summary_stats$sample_mean, 2)` minutes
+- This is `r round(baseline_mean - summary_stats$sample_mean, 2)` minutes faster than the baseline of `r baseline_mean` minutes
+
+But is this difference *statistically significant*, or could it have occurred by chance?
+
+## Step 5: Perform a One-Sample t-Test
+
+Since we're testing whether the new times are *lower* than the baseline, we use a one-sided test.
+
+```{r}
+# Perform the t-test
+t_test_result <- t.test(
+  response_data$response_time,
+  mu = baseline_mean,
+  alternative = "less"  # We expect times to be LESS (faster)
+)
+
+t_test_result
+```
+
+## Step 6: Interpret the Results
+
+```{r}
+# Extract key values
+t_statistic <- t_test_result$statistic
+p_value <- t_test_result$p.value
+conf_interval <- t_test_result$conf.int
+
+# Create interpretation
+interpretation <- tibble(
+  Metric = c(
+    "Baseline Mean (before program)",
+    "Sample Mean (after program)",
+    "Difference",
+    "t-statistic",
+    "p-value",
+    "Significant at α = 0.05?"
+  ),
+  Value = c(
+    paste(baseline_mean, "minutes"),
+    paste(round(summary_stats$sample_mean, 2), "minutes"),
+    paste(round(baseline_mean - summary_stats$sample_mean, 2), "minutes faster"),
+    round(t_statistic, 3),
+    format(p_value, scientific = FALSE, digits = 4),
+    ifelse(p_value < alpha, "Yes - Reject null hypothesis", "No - Fail to reject null hypothesis")
+  )
+)
+
+knitr::kable(interpretation, caption = "Hypothesis Test Results")
+```
+
+## Step 7: Visualize the Test
+
+```{r}
+# Create a visualization showing the distribution and our sample mean
+ggplot(response_data, aes(x = response_time)) +
+  geom_histogram(aes(y = after_stat(density)), bins = 10, fill = "steelblue", alpha = 0.7) +
+  geom_vline(xintercept = baseline_mean, color = "red", linetype = "dashed", size = 1.2) +
+  geom_vline(xintercept = summary_stats$sample_mean, color = "darkgreen", size = 1.2) +
+  annotate("text", x = baseline_mean + 0.1, y = 0.8,
+           label = paste("Baseline:", baseline_mean),
+           color = "red", hjust = 0, fontface = "bold") +
+  annotate("text", x = summary_stats$sample_mean - 0.1, y = 0.7,
+           label = paste("New Mean:", round(summary_stats$sample_mean, 2)),
+           color = "darkgreen", hjust = 1, fontface = "bold") +
+  labs(
+    title = "Emergency Response Times: Before vs. After Community Policing",
+    subtitle = paste0("p-value = ", round(p_value, 4),
+                      ifelse(p_value < 0.05, " (Statistically Significant)", " (Not Significant)")),
+    x = "Response Time (minutes)",
+    y = "Density"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold"))
+```
+
+## Step 8: Two-Sample t-Test Example
+
+Sometimes we want to compare two groups directly rather than comparing to a known baseline. Let's compare response times between two different neighborhoods.
+
+```{r}
+# Create data for two neighborhoods
+neighborhood_data <- tibble(
+  neighborhood = c(rep("Downtown", 15), rep("Suburbs", 15)),
+  response_time = c(
+    # Downtown times
+    7.2, 6.8, 7.5, 7.1, 6.9, 7.3, 7.0, 6.7, 7.4, 7.2, 6.8, 7.1, 7.0, 6.9, 7.3,
+    # Suburban times
+    9.1, 8.7, 9.3, 8.9, 9.5, 8.8, 9.2, 9.0, 8.6, 9.4, 9.1, 8.8, 9.3, 9.0, 8.9
+  )
+)
+
+# View summary by neighborhood
+neighborhood_data |>
+  group_by(neighborhood) |>
+  summarize(
+    mean_time = mean(response_time),
+    sd_time = sd(response_time),
+    n = n()
+  )
+```
+
+```{r}
+# Two-sample t-test
+two_sample_test <- t.test(response_time ~ neighborhood, data = neighborhood_data)
+two_sample_test
+```
+
+```{r}
+# Visualize the comparison
+ggplot(neighborhood_data, aes(x = neighborhood, y = response_time, fill = neighborhood)) +
+  geom_boxplot(alpha = 0.7) +
+  geom_jitter(width = 0.2, alpha = 0.5) +
+  scale_fill_manual(values = c("Downtown" = "steelblue", "Suburbs" = "coral")) +
+  labs(
+    title = "Emergency Response Times by Neighborhood",
+    subtitle = paste("Two-sample t-test p-value:", format(two_sample_test$p.value, scientific = TRUE, digits = 3)),
+    x = "Neighborhood",
+    y = "Response Time (minutes)"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "none")
+```
+
+## Step 9: Understanding P-Values
+
+The p-value answers: **If there were truly no difference, what's the probability of seeing results as extreme as ours?**
+
+```{r}
+# Create a table explaining p-value interpretation
+p_value_guide <- tibble(
+  `P-value Range` = c("p < 0.001", "0.001 ≤ p < 0.01", "0.01 ≤ p < 0.05", "p ≥ 0.05"),
+  `Interpretation` = c(
+    "Very strong evidence against null hypothesis",
+    "Strong evidence against null hypothesis",
+    "Moderate evidence against null hypothesis",
+    "Insufficient evidence to reject null hypothesis"
+  ),
+  `Typical Description` = c(
+    "Highly significant",
+    "Very significant",
+    "Significant",
+    "Not significant"
+  )
+)
+
+knitr::kable(p_value_guide, caption = "Guide to Interpreting P-values")
+```
+
+## Conclusion: Writing the Story
+
+Based on our analysis:
+
+**For the one-sample test (community policing program):**
+- The mean response time decreased from `r baseline_mean` minutes to `r round(summary_stats$sample_mean, 2)` minutes
+- This represents a `r round((baseline_mean - summary_stats$sample_mean) / baseline_mean * 100, 1)`% improvement
+- The p-value of `r round(p_value, 4)` is `r ifelse(p_value < 0.05, "less", "greater")` than 0.05
+- `r ifelse(p_value < 0.05, "We have statistical evidence that the program improved response times", "We cannot conclude the program made a significant difference")`
+
+**For the two-sample test (neighborhood comparison):**
+- Downtown response times (mean: `r round(mean(neighborhood_data$response_time[neighborhood_data$neighborhood == "Downtown"]), 1)` min) are significantly faster than suburban times (mean: `r round(mean(neighborhood_data$response_time[neighborhood_data$neighborhood == "Suburbs"]), 1)` min)
+- This difference is statistically significant (p < 0.001)
+
+**Remember:** Statistical significance tells us whether an effect exists, but not whether it matters. In the next activity, we'll learn about effect size to measure how meaningful these differences actually are.

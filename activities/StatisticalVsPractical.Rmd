@@ -1,0 +1,352 @@
+---
+title: "Statistical vs. Practical Significance: A Journalist's Guide"
+output:
+  html_document:
+    toc: true
+    toc_float: true
+    theme: cosmo
+    highlight: tango
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
+```
+
+## Introduction
+
+As journalists covering data-driven stories, we often encounter claims like "statistically significant improvement" or "proven effective." But what do these claims really mean, and when should we be skeptical?
+
+In this activity, we'll explore the critical difference between **statistical significance** (did something happen?) and **practical significance** (does it matter?).
+
+## Step 1: Load Required Libraries
+
+```{r}
+library(tidyverse)
+```
+
+## Step 2: The Four Scenarios Framework
+
+Every statistical result falls into one of four categories:
+
+| | Practically Meaningful | Not Practically Meaningful |
+|---|---|---|
+| **Statistically Significant** | ✓ Report with confidence | ⚠️ Be cautious - might be misleading |
+| **Not Statistically Significant** | ⚠️ Needs more data | ✗ No story here |
+
+Let's explore each scenario with real-world journalism examples.
+
+## Scenario 1: Statistically Significant AND Practically Meaningful
+
+**The Story:** A new traffic signal timing system claims to reduce commute times.
+
+```{r}
+# Simulated commute data (minutes)
+set.seed(101)
+before_signal <- rnorm(30, mean = 45, sd = 8)  # Before the new system
+after_signal <- rnorm(30, mean = 38, sd = 7)   # After implementation
+
+commute_data <- tibble(
+  period = c(rep("Before", 30), rep("After", 30)),
+  commute_time = c(before_signal, after_signal)
+)
+
+# Summary
+commute_summary <- commute_data |>
+  group_by(period) |>
+  summarize(
+    mean_time = mean(commute_time),
+    sd_time = sd(commute_time),
+    n = n()
+  )
+
+commute_summary
+```
+
+```{r}
+# Statistical test
+commute_test <- t.test(commute_time ~ period, data = commute_data)
+commute_test
+
+# Effect size (Cohen's d)
+commute_d <- (mean(before_signal) - mean(after_signal)) /
+  sqrt((sd(before_signal)^2 + sd(after_signal)^2) / 2)
+
+cat("Cohen's d:", round(commute_d, 3), "\n")
+cat("Time saved:", round(mean(before_signal) - mean(after_signal), 1), "minutes\n")
+```
+
+**Interpretation:**
+- p-value < 0.05: The difference is statistically significant
+- Cohen's d ≈ 0.9: This is a large effect size
+- Real-world impact: ~7 minutes saved per commute = 35 minutes/week = 30+ hours/year
+
+**This is a story worth reporting!**
+
+## Scenario 2: Statistically Significant but NOT Practically Meaningful
+
+**The Story:** A tech company claims their app "significantly reduces screen time."
+
+```{r}
+# Large sample with tiny effect
+set.seed(202)
+n_users <- 5000
+
+app_data <- tibble(
+  group = c(rep("Control", n_users), rep("App Users", n_users)),
+  screen_time = c(
+    rnorm(n_users, mean = 240, sd = 45),  # Control: 4 hours
+    rnorm(n_users, mean = 237, sd = 45)   # App: 3 minutes less!
+  )
+)
+
+# Summary
+app_summary <- app_data |>
+  group_by(group) |>
+  summarize(
+    mean_minutes = mean(screen_time),
+    sd_minutes = sd(screen_time),
+    n = n()
+  )
+
+app_summary
+```
+
+```{r}
+# Statistical test
+app_test <- t.test(screen_time ~ group, data = app_data)
+app_test
+
+# Effect size
+app_d <- (mean(app_data$screen_time[app_data$group == "Control"]) -
+          mean(app_data$screen_time[app_data$group == "App Users"])) /
+  sqrt((sd(app_data$screen_time[app_data$group == "Control"])^2 +
+        sd(app_data$screen_time[app_data$group == "App Users"])^2) / 2)
+
+cat("Cohen's d:", round(app_d, 3), "\n")
+cat("Time saved:", round(240 - 237, 1), "minutes per day\n")
+```
+
+**Interpretation:**
+- p-value < 0.05: Statistically significant (due to large sample)
+- Cohen's d ≈ 0.07: Negligible effect size
+- Real-world impact: 3 minutes/day is trivial
+
+**Be skeptical of this claim! The "significance" is a statistical artifact of the large sample size.**
+
+## Scenario 3: NOT Statistically Significant but Possibly Meaningful
+
+**The Story:** A pilot program testing smaller class sizes.
+
+```{r}
+# Small pilot with potentially meaningful effect
+set.seed(303)
+pilot_data <- tibble(
+  class_type = c(rep("Regular (30 students)", 8), rep("Small (15 students)", 8)),
+  test_score = c(
+    rnorm(8, mean = 72, sd = 12),  # Regular classes
+    rnorm(8, mean = 78, sd = 10)   # Small classes (6 point improvement)
+  )
+)
+
+# Summary
+pilot_summary <- pilot_data |>
+  group_by(class_type) |>
+  summarize(
+    mean_score = mean(test_score),
+    sd_score = sd(test_score),
+    n = n()
+  )
+
+pilot_summary
+```
+
+```{r}
+# Statistical test
+pilot_test <- t.test(test_score ~ class_type, data = pilot_data)
+pilot_test
+
+# Effect size
+pilot_d <- (mean(pilot_data$test_score[pilot_data$class_type == "Small (15 students)"]) -
+            mean(pilot_data$test_score[pilot_data$class_type == "Regular (30 students)"])) /
+  sqrt((sd(pilot_data$test_score[pilot_data$class_type == "Small (15 students)"])^2 +
+        sd(pilot_data$test_score[pilot_data$class_type == "Regular (30 students)"])^2) / 2)
+
+cat("Cohen's d:", round(pilot_d, 3), "\n")
+cat("Score improvement:", round(78 - 72, 1), "points\n")
+```
+
+**Interpretation:**
+- p-value might be > 0.05: Not statistically significant (due to small sample)
+- Cohen's d might be medium-sized: Potentially meaningful
+- Real-world impact: 6 points could be the difference between a C and B grade
+
+**This deserves follow-up! The small sample may be masking a real effect.**
+
+## Step 3: Creating a Decision Framework
+
+```{r}
+# Function to analyze and categorize results
+analyze_result <- function(p_value, cohens_d, practical_threshold = 0.3) {
+  sig <- p_value < 0.05
+  meaningful <- abs(cohens_d) >= practical_threshold
+
+  category <- case_when(
+    sig & meaningful ~ "Report: Both significant and meaningful",
+    sig & !meaningful ~ "Caution: Significant but trivial effect",
+    !sig & meaningful ~ "Investigate: Might need larger sample",
+    TRUE ~ "No story: Neither significant nor meaningful"
+  )
+
+  return(category)
+}
+
+# Apply to our three scenarios
+scenarios <- tibble(
+  Scenario = c("Traffic Signals", "Screen Time App", "Class Size Pilot"),
+  P_Value = c(commute_test$p.value, app_test$p.value, pilot_test$p.value),
+  Cohens_d = c(commute_d, app_d, pilot_d),
+  Category = c(
+    analyze_result(commute_test$p.value, commute_d),
+    analyze_result(app_test$p.value, app_d),
+    analyze_result(pilot_test$p.value, pilot_d)
+  )
+)
+
+knitr::kable(scenarios, digits = 3, caption = "Analysis of Three Scenarios")
+```
+
+## Step 4: Visualizing the Four Quadrants
+
+```{r}
+# Create a visualization showing the four quadrants
+quadrant_data <- tibble(
+  study = c("Traffic Signals", "Screen Time App", "Class Size Pilot", "Null Result"),
+  p_value = c(0.001, 0.02, 0.12, 0.45),
+  cohens_d = c(0.9, 0.07, 0.55, 0.1),
+  label = c("Report!", "Be Skeptical", "Investigate More", "No Story")
+)
+
+ggplot(quadrant_data, aes(x = cohens_d, y = -log10(p_value))) +
+  # Add quadrant rectangles
+  annotate("rect", xmin = 0.2, xmax = 1.5, ymin = 1.3, ymax = 4,
+           fill = "darkgreen", alpha = 0.2) +
+  annotate("rect", xmin = -0.1, xmax = 0.2, ymin = 1.3, ymax = 4,
+           fill = "orange", alpha = 0.2) +
+  annotate("rect", xmin = 0.2, xmax = 1.5, ymin = 0, ymax = 1.3,
+           fill = "yellow", alpha = 0.2) +
+  annotate("rect", xmin = -0.1, xmax = 0.2, ymin = 0, ymax = 1.3,
+           fill = "red", alpha = 0.2) +
+  # Add reference lines
+  geom_hline(yintercept = -log10(0.05), linetype = "dashed", color = "gray50") +
+  geom_vline(xintercept = 0.2, linetype = "dashed", color = "gray50") +
+  # Add points
+  geom_point(aes(color = label), size = 5) +
+  geom_text(aes(label = study), vjust = -1, size = 3.5) +
+  # Labels
+  annotate("text", x = 0.85, y = 3.5, label = "Significant &\nMeaningful",
+           fontface = "bold", color = "darkgreen") +
+  annotate("text", x = 0.05, y = 3.5, label = "Significant but\nTrivial",
+           fontface = "bold", color = "darkorange") +
+  annotate("text", x = 0.85, y = 0.5, label = "Meaningful but\nNot Proven",
+           fontface = "bold", color = "goldenrod4") +
+  annotate("text", x = 0.05, y = 0.5, label = "No Effect",
+           fontface = "bold", color = "darkred") +
+  scale_color_manual(values = c("Report!" = "darkgreen",
+                                 "Be Skeptical" = "darkorange",
+                                 "Investigate More" = "goldenrod",
+                                 "No Story" = "darkred")) +
+  labs(
+    title = "The Four Quadrants of Statistical Results",
+    subtitle = "Combining p-values and effect sizes for better journalism",
+    x = "Effect Size (Cohen's d)",
+    y = "-log10(p-value)\n(Higher = More Significant)",
+    color = "Editorial Decision"
+  ) +
+  theme_minimal() +
+  theme(legend.position = "bottom")
+```
+
+## Step 5: Questions to Ask Before Reporting
+
+```{r}
+# Create a journalist's checklist
+checklist <- tibble(
+  Question = c(
+    "1. What is the p-value?",
+    "2. What is the effect size (Cohen's d)?",
+    "3. What is the sample size?",
+    "4. What is the real-world impact?",
+    "5. Could a large sample be inflating significance?",
+    "6. Could a small sample be hiding a real effect?",
+    "7. Who funded the study?",
+    "8. Has this been replicated?"
+  ),
+  Why_It_Matters = c(
+    "Determines statistical significance (< 0.05 threshold)",
+    "Determines if the effect is large enough to matter",
+    "Small samples: might miss real effects; Large samples: might find trivial effects",
+    "Translate statistics into everyday terms (minutes, dollars, lives)",
+    "With 10,000 subjects, even tiny differences become 'significant'",
+    "With 10 subjects, even large differences might not reach significance",
+    "Conflicts of interest might affect study design or interpretation",
+    "One study is never enough; look for consistent findings"
+  )
+)
+
+knitr::kable(checklist, caption = "A Journalist's Statistical Checklist")
+```
+
+## Step 6: Practice - Analyzing a Press Release
+
+**Press Release:** "Our new tutoring program produces statistically significant improvements in math scores (p = 0.03)."
+
+Let's investigate:
+
+```{r}
+# Data provided in the press release
+tutoring_stats <- tibble(
+  Metric = c("Sample Size", "Before Mean", "After Mean", "Improvement",
+             "Standard Deviation", "P-value"),
+  Value = c("2,500 students", "68 points", "69 points", "1 point",
+            "15 points", "0.03")
+)
+
+knitr::kable(tutoring_stats, caption = "Tutoring Program Press Release Data")
+
+# Calculate effect size
+tutoring_d <- (69 - 68) / 15
+cat("\nCalculated Cohen's d:", round(tutoring_d, 3))
+cat("\nEffect category:", ifelse(abs(tutoring_d) < 0.2, "Negligible",
+                                  ifelse(abs(tutoring_d) < 0.5, "Small",
+                                         ifelse(abs(tutoring_d) < 0.8, "Medium", "Large"))))
+```
+
+**Analysis:**
+- The p-value (0.03) is statistically significant
+- But Cohen's d (0.067) is negligible
+- The large sample (2,500 students) detected a tiny effect
+- A 1-point improvement on a 100-point scale is not practically meaningful
+
+**Better Headline:** "Tutoring Program Shows Minimal Impact: Students Gain Just 1 Point on Average"
+
+## Conclusion
+
+```{r}
+# Final summary table
+summary_guidance <- tibble(
+  `Statistical Significance` = c("Yes (p < 0.05)", "Yes (p < 0.05)",
+                                  "No (p ≥ 0.05)", "No (p ≥ 0.05)"),
+  `Effect Size` = c("Medium/Large (d > 0.3)", "Small/Negligible (d < 0.3)",
+                    "Medium/Large (d > 0.3)", "Small/Negligible (d < 0.3)"),
+  `Recommendation` = c(
+    "REPORT: Confident story about meaningful change",
+    "CAUTION: Question the practical importance",
+    "INVESTIGATE: Consider if underpowered study",
+    "SKIP: No evidence of meaningful effect"
+  )
+)
+
+knitr::kable(summary_guidance, caption = "Decision Guide for Journalists")
+```
+
+**Remember:** Your job as a journalist is not just to report that something is "statistically significant," but to help your audience understand whether it actually matters in their lives.

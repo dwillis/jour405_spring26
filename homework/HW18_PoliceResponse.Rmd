@@ -1,0 +1,265 @@
+---
+title: "HW18: Hypothesis Testing - Police Response Times"
+name: REPLACE WITH YOUR NAME
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+library(tidyverse)
+```
+
+## Introduction
+
+The city of Riverside recently implemented a new dispatch system that the police chief claims has reduced emergency response times. Before the new system, the average response time for priority calls was 9.5 minutes with a standard deviation of 2.1 minutes.
+
+Your editor wants you to investigate: **Is there statistical evidence that response times have actually improved?**
+
+You've obtained data from 25 randomly selected priority calls after the new system was implemented.
+
+## Task 1: Set Up the Data (2 points)
+
+First, let's organize the data and establish our baseline. Fill in the REPLACE_ME values based on the introduction.
+
+```{r}
+# Known baseline (before the new dispatch system)
+baseline_mean <- REPLACE_ME  # average response time in minutes
+baseline_sd <- REPLACE_ME    # standard deviation in minutes
+alpha <- 0.05  # significance level
+
+# Response times (in minutes) after the new dispatch system
+# Data from 25 randomly selected priority calls
+new_response_times <- c(
+  8.7, 9.1, 8.5, 9.3, 8.2,
+  8.9, 8.4, 9.0, 8.6, 8.8,
+  9.2, 8.3, 8.7, 8.5, 9.1,
+  8.4, 8.8, 8.6, 9.0, 8.5,
+  8.9, 8.7, 8.3, 8.8, 8.6
+)
+
+# Create a tibble with the data
+response_data <- tibble(
+  call_number = 1:25,
+  response_time = new_response_times
+)
+
+# View the data
+response_data
+```
+
+### Reflection Question 1:
+Looking at the raw numbers in response_data, do you notice any patterns? What is your initial impression about whether times have improved?
+
+ANSWER HERE
+
+
+## Task 2: Calculate Summary Statistics (3 points)
+
+Now calculate the key statistics for the new response times. Fill in the REPLACE_ME values.
+
+```{r}
+# Calculate summary statistics
+response_stats <- response_data |>
+  summarize(
+    sample_size = n(),
+    sample_mean = mean(REPLACE_ME),
+    sample_sd = sd(REPLACE_ME),
+    standard_error = sample_sd / sqrt(sample_size),
+    min_time = min(response_time),
+    max_time = max(response_time)
+  )
+
+response_stats
+```
+
+```{r}
+# Calculate the difference from baseline
+improvement <- baseline_mean - response_stats$sample_mean
+percent_change <- (improvement / baseline_mean) * 100
+
+cat("Baseline mean:", baseline_mean, "minutes\n")
+cat("New mean:", round(response_stats$sample_mean, 2), "minutes\n")
+cat("Improvement:", round(improvement, 2), "minutes\n")
+cat("Percent improvement:", round(percent_change, 1), "%\n")
+```
+
+### Reflection Question 2:
+Based on these summary statistics, how much faster (in minutes and percentage) are the new response times compared to the baseline? Is this difference meaningful from a practical standpoint for emergency services?
+
+ANSWER HERE
+
+
+## Task 3: State Your Hypotheses (3 points)
+
+Before running the statistical test, clearly state your hypotheses.
+
+**Null Hypothesis (H₀):** REPLACE_ME (Hint: What would it mean if the new system had NO effect?)
+
+**Alternative Hypothesis (H₁):** REPLACE_ME (Hint: What is the police chief claiming?)
+
+**Significance Level:** α = REPLACE_ME
+
+### Reflection Question 3:
+Why do we use a one-sided test (alternative = "less") rather than a two-sided test in this scenario?
+
+ANSWER HERE
+
+
+## Task 4: Perform the Hypothesis Test (5 points)
+
+Now let's run the one-sample t-test. We use "less" because we expect response times to be lower (faster) with the new system.
+
+```{r}
+# Perform the one-sample t-test
+t_test_result <- t.test(
+  response_data$REPLACE_ME,  # The column containing our data
+  mu = REPLACE_ME,           # The baseline mean we're comparing against
+  alternative = "less"       # We expect times to be LESS (faster)
+)
+
+t_test_result
+```
+
+```{r}
+# Extract and display key results
+p_value <- t_test_result$p.value
+t_statistic <- t_test_result$statistic
+conf_interval <- t_test_result$conf.int
+
+cat("t-statistic:", round(t_statistic, 4), "\n")
+cat("p-value:", format(p_value, scientific = FALSE, digits = 6), "\n")
+cat("95% Confidence Interval: (-Inf,", round(conf_interval[2], 2), ")\n")
+```
+
+### Reflection Question 4:
+What does the p-value tell you? Based on the p-value and your significance level, do you reject or fail to reject the null hypothesis? What does this mean in plain English?
+
+ANSWER HERE
+
+
+## Task 5: Visualize the Results (4 points)
+
+Create a visualization to help readers understand the data.
+
+```{r}
+# Choose a fill color for your histogram
+my_fill_color <- "REPLACE_ME"  # Replace with a color like "steelblue", "darkgreen", etc.
+
+# Create a histogram with reference lines
+ggplot(response_data, aes(x = response_time)) +
+  geom_histogram(bins = 10, fill = my_fill_color, color = "white", alpha = 0.7) +
+  geom_vline(xintercept = baseline_mean, color = "red", linetype = "dashed", size = 1.2) +
+  geom_vline(xintercept = response_stats$sample_mean, color = "darkgreen", size = 1.2) +
+  annotate("text", x = baseline_mean + 0.15, y = 5,
+           label = paste("Baseline:", baseline_mean, "min"),
+           color = "red", hjust = 0, fontface = "bold") +
+  annotate("text", x = response_stats$sample_mean - 0.15, y = 4.5,
+           label = paste("New Mean:", round(response_stats$sample_mean, 2), "min"),
+           color = "darkgreen", hjust = 1, fontface = "bold") +
+  labs(
+    title = "Police Response Times: Before vs. After New Dispatch System",
+    subtitle = paste0("p-value = ", round(p_value, 4)),
+    x = "Response Time (minutes)",
+    y = "Number of Calls",
+    caption = "Source: Riverside Police Department"
+  ) +
+  theme_minimal() +
+  theme(plot.title = element_text(face = "bold", size = 14))
+```
+
+### Reflection Question 5:
+Look at your visualization. Does it effectively communicate the story? What would you change about the title to make it more journalistic (focusing on findings rather than description)?
+
+ANSWER HERE
+
+
+## Task 6: Create a Story Summary (5 points)
+
+Let's compile all the key statistics for your news story.
+
+```{r}
+# Create a summary table for your story
+story_summary <- tibble(
+  Metric = c(
+    "Previous Average Response Time",
+    "New Average Response Time",
+    "Time Improvement",
+    "Percent Improvement",
+    "Sample Size",
+    "P-value",
+    "Statistically Significant?"
+  ),
+  Value = c(
+    paste(baseline_mean, "minutes"),
+    paste(round(response_stats$sample_mean, 2), "minutes"),
+    paste(round(improvement, 2), "minutes faster"),
+    paste(round(percent_change, 1), "%"),
+    response_stats$sample_size,
+    format(p_value, scientific = FALSE, digits = 4),
+    ifelse(p_value < alpha, "Yes", "No")
+  )
+)
+
+knitr::kable(story_summary, caption = "Key Statistics for News Story")
+```
+
+### Reflection Question 6:
+Based on all of your analysis, write a headline and lead paragraph for this story. Make sure to include the key numbers that readers need to know. Is the police chief's claim supported by the data?
+
+**Headline:** ANSWER HERE
+
+**Lead Paragraph:** ANSWER HERE
+
+
+## Task 7: Consider Limitations (3 points)
+
+No statistical analysis is complete without acknowledging its limitations.
+
+### Reflection Question 7:
+What are at least THREE limitations or questions about this data that you would want to address before publishing? Consider: sample selection, time period, types of calls, geographic distribution, etc.
+
+ANSWER HERE
+
+
+## Task 8: Bonus - Two-Sample Test (5 bonus points)
+
+The police department has also provided data comparing response times in two different districts. District A got the new system first; District B is still using the old system.
+
+```{r}
+# Two-district comparison data
+district_data <- tibble(
+  district = c(rep("District A (New System)", 20), rep("District B (Old System)", 20)),
+  response_time = c(
+    # District A (new system)
+    8.5, 8.9, 8.2, 8.7, 8.4, 9.0, 8.3, 8.8, 8.6, 8.5,
+    8.9, 8.4, 8.7, 8.5, 8.8, 8.3, 8.6, 8.9, 8.4, 8.7,
+    # District B (old system)
+    9.4, 9.8, 9.2, 9.6, 10.1, 9.5, 9.3, 9.7, 9.9, 9.4,
+    9.6, 10.0, 9.3, 9.5, 9.8, 9.4, 9.7, 9.2, 9.6, 9.5
+  )
+)
+
+# Calculate summary by district
+district_summary <- district_data |>
+  group_by(district) |>
+  summarize(
+    mean_time = mean(response_time),
+    sd_time = sd(response_time),
+    n = n()
+  )
+
+district_summary
+```
+
+```{r}
+# Perform a two-sample t-test
+two_sample_test <- t.test(response_time ~ district, data = district_data)
+two_sample_test
+```
+
+### Bonus Reflection:
+How do these results compare to the one-sample test? Which comparison (before/after or district A/district B) provides stronger evidence for the effectiveness of the new system? Why?
+
+ANSWER HERE
+
+
+When finished, save your work and submit via GitHub.
