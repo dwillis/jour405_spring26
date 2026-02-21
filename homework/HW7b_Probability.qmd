@@ -1,0 +1,138 @@
+---
+title: "HW7b - Probability and the Normal Distribution"
+---
+
+In this assignment, you'll build on your z-score skills to answer probability questions using the normal distribution. You'll return to the White House salaries data and use it to answer the kinds of "what are the chances?" questions that come up in journalism all the time. This sets the stage for sampling, which we'll cover next.
+
+### Task 1: Load the tidyverse and the data (1 point)
+
+Load the tidyverse and the White House salaries data from https://raw.githubusercontent.com/dwillis/jour405/refs/heads/main/data/white_house_salaries_2025.csv
+
+```{r}
+```
+
+### Task 2: Filter and summarize (2 points)
+
+You may remember from HW3 that some White House staffers have a salary of $0. Let's filter those out and focus on paid employees, saving the result to a new dataframe called `wh_paid`. You need to calculate the mean, median and standard deviation of the salary column using `wh_paid`:
+
+```{r}
+wh_paid <- wh_salaries |>
+  filter(SALARY > 0)
+```
+
+Now create a histogram of the paid salaries with a vertical line for the mean and two more for ±1 standard deviation, similar to what you did in HW6 with Spotify data.
+
+```{r}
+```
+
+**Describe the shape of the distribution. Is it roughly normal? Skewed? Where do most salaries cluster?**
+
+ANSWER HERE
+
+### Task 3: The Empirical Rule (3 points)
+
+The empirical rule (also called the 68-95-99.7 rule) says that for a normal distribution:
+- About 68% of data falls within 1 standard deviation of the mean
+- About 95% falls within 2 standard deviations
+- About 99.7% falls within 3 standard deviations
+
+Let's test this. We'll calculate the salary ranges for 1, 2, and 3 standard deviations from the mean, then count how many employees actually fall in each range.
+
+```{r}
+mean_sal <- mean(wh_paid$SALARY)
+sd_sal <- sd(wh_paid$SALARY)
+total_n <- nrow(wh_paid)
+
+empirical <- tibble(
+  range = c("Within 1 SD", "Within 2 SD", "Within 3 SD"),
+  lower = c(mean_sal - sd_sal, mean_sal - 2 * sd_sal, mean_sal - 3 * sd_sal),
+  upper = c(mean_sal + sd_sal, mean_sal + 2 * sd_sal, mean_sal + 3 * sd_sal),
+  expected_pct = c(68, 95, 99.7),
+  actual_count = c(
+    sum(wh_paid$SALARY >= (mean_sal - sd_sal) & wh_paid$SALARY <= (mean_sal + sd_sal)),
+    sum(wh_paid$SALARY >= (mean_sal - 2 * sd_sal) & wh_paid$SALARY <= (mean_sal + 2 * sd_sal)),
+    sum(wh_paid$SALARY >= (mean_sal - 3 * sd_sal) & wh_paid$SALARY <= (mean_sal + 3 * sd_sal))
+  ),
+  actual_pct = round((actual_count / total_n) * 100, 1)
+)
+
+empirical
+```
+
+**How closely does the data follow the empirical rule? What does any deviation tell you about the distribution?**
+
+ANSWER HERE
+
+### Task 4: From z-scores to probability with pnorm() (4 points)
+
+In class, you used `pnorm()` to find the probability of specific car theft months. Now apply the same approach to salaries.
+
+Your editor asks: **"What's the probability that a randomly selected White House employee makes more than $150,000?"**
+
+Calculate the z-score for $150,000, use `pnorm()` to find the probability, and check your answer against the actual data.
+
+```{r}
+
+```
+
+**Write a sentence stating this probability in plain English. How does the normal approximation compare to the actual percentage?**
+
+ANSWER HERE
+
+### Task 5: Probability between two values (3 points)
+
+Now your editor asks: **"What percentage of White House employees make between $80,000 and $120,000?"**
+
+You'll need to calculate z-scores for the lower and upper boundaries, use `pnorm()` for each, and subtract to find the probability between them.
+
+```{r}
+
+```
+
+**Interpret this result. What does this "middle range" tell us about the White House salary structure?**
+
+ANSWER HERE
+
+### Task 6: Expected vs. observed (3 points)
+
+Let's compare what the normal distribution *predicts* to what we actually *see*. This idea — comparing expected to observed — is one you'll use again later in the course.
+
+Create these salary bins and calculate the expected count (from the normal distribution) and the observed count (from the actual data) for each:
+
+```{r}
+bins <- tibble(
+  category = c("Below $60k", "$60k-$90k", "$90k-$120k", "$120k-$150k", "Above $150k"),
+  lower = c(-Inf, 60000, 90000, 120000, 150000),
+  upper = c(60000, 90000, 120000, 150000, Inf)
+) |>
+  mutate(
+    expected_pct = pnorm(upper, mean = mean_sal, sd = sd_sal) - pnorm(lower, mean = mean_sal, sd = sd_sal),
+    expected_count = round(expected_pct * total_n, 1),
+    observed_count = c(
+      sum(wh_paid$SALARY < 60000),
+      sum(wh_paid$SALARY >= 60000 & wh_paid$SALARY < 90000),
+      sum(wh_paid$SALARY >= 90000 & wh_paid$SALARY < 120000),
+      sum(wh_paid$SALARY >= 120000 & wh_paid$SALARY < 150000),
+      sum(wh_paid$SALARY >= 150000)
+    ),
+    difference = observed_count - expected_count
+  )
+
+bins |> select(category, expected_count, observed_count, difference)
+```
+
+**Where does reality differ most from what the normal distribution predicts? What might explain those differences?**
+
+ANSWER HERE
+
+### Task 7: Story pitch (4 points)
+
+Based on your probability analysis, write a headline and lede for a story about White House salaries. Your lede should incorporate at least one probability or percentage you calculated.
+
+Then write 2-3 sentences describing how you would use probability thinking to advance this story — what would you compare these probabilities to, and what additional analysis would help?
+
+ANSWER HERE
+
+### Task 8: Save Your Work and Put it on GitHub
+
+Save this notebook, then commit it to your local repository. Push the changes to your GitHub repository and submit the URL for this file in ELMS.
