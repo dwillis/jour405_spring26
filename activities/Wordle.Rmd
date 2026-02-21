@@ -1,6 +1,5 @@
 ---
 title: "Wordle Probability Exercise"
-author: "Your Name"
 ---
 
 ```{r setup, include=FALSE}
@@ -308,146 +307,179 @@ if (length(remaining_words_strategic) < length(remaining_words_random)) {
 cat(sprintf("\nThe target word was: '%s'\n", target_word))
 ```
 
-## Simulating Multiple Guesses
+## Simulating Many Games to See Patterns
 
-Let's continue our game and see how probabilities change with subsequent guesses.
+Instead of analyzing just one game, let's simulate many games and look at the distribution of results. This lets us use `pnorm()` to ask questions about how likely different outcomes are.
 
 ```{r}
-# Function to simulate multiple guesses
-continue_game <- function(remaining_words, target_word, max_guesses = 3) {
-  current_words <- remaining_words
-  probabilities <- c(1 / length(current_words))
-  n_remaining <- c(length(current_words))
-  guesses <- character(0)
-  feedbacks <- list()
+# Simulate 1000 games with a random first guess and count remaining words after guess 1
+set.seed(42)
+n_simulations <- 1000
+
+remaining_after_guess <- numeric(n_simulations)
+
+for (i in 1:n_simulations) {
+  # Pick a random target
+  target <- sample(wordle_db, 1)
+  # Pick a random first guess (different from target)
+  guess <- sample(wordle_db, 1)
   
-  for (i in 1:max_guesses) {
-    if (length(current_words) == 0 || length(current_words) == 1) break
-    
-    # For simplicity, we'll just pick the first word in our filtered list
-    guess <- current_words[1]
-    guesses <- c(guesses, guess)
-    
-    feedback <- wordle_feedback(guess, target_word)
-    feedbacks[[i]] <- feedback
-    
-    current_words <- filter_words(current_words, guess, feedback)
-    
-    if (length(current_words) > 0) {
-      probabilities <- c(probabilities, 1/length(current_words))
-      n_remaining <- c(n_remaining, length(current_words))
-    }
-    
-    if (guess == target_word) break
-  }
+  # Get feedback
+  feedback <- wordle_feedback(guess, target)
   
-  return(list(
-    probabilities = probabilities, 
-    n_remaining = n_remaining,
-    guesses = guesses,
-    feedbacks = feedbacks
-  ))
+  # Count remaining possible words
+  remaining <- filter_words(wordle_db, guess, feedback)
+  remaining_after_guess[i] <- length(remaining)
 }
 
-# Continue from our strategic first guess
-cat("Continuing from our strategic first guess: ", strategic_guess, "\n\n")
-strategic_game <- continue_game(remaining_words_strategic, target_word)
-
-# Display the results
-cat("Guess sequence:\n")
-for (i in 1:length(strategic_game$guesses)) {
-  cat(sprintf("Guess %d: '%s'\n", i+1, strategic_game$guesses[i]))
-  cat("Feedback: ", strategic_game$feedbacks[[i]], "\n")
-  cat(sprintf("Remaining words: %d\n", strategic_game$n_remaining[i+1]))
-  cat(sprintf("Probability: 1/%d = %.6f (%.6f%%)\n\n", 
-              strategic_game$n_remaining[i+1], 
-              strategic_game$probabilities[i+1], 
-              strategic_game$probabilities[i+1] * 100))
-}
-
-# Visualize probability progression
-# Make sure the vectors have the same length
-all_probabilities <- c(initial_prob, new_prob_strategic, strategic_game$probabilities)
-all_probabilities_percent <- all_probabilities * 100
-guess_numbers <- 0:(length(all_probabilities_percent)-1)  # Start from 0 for initial probability
-
-# Verify lengths match before plotting
-cat(sprintf("Length of guess_numbers: %d, Length of probabilities: %d\n", 
-            length(guess_numbers), length(all_probabilities_percent)))
-
-# Create the plot
-plot(guess_numbers, all_probabilities_percent, type="b", col="blue", pch=19,
-     xlab="Guess Number", ylab="Probability (%)", main="Probability Progression During Game",
-     ylim=c(0, max(all_probabilities_percent) * 1.1),
-     xaxt="n")  # Suppress default x-axis
-
-# Create custom x-axis with appropriate labels
-axis(1, at=guess_numbers, labels=c("Initial", paste("Guess", 1:(length(guess_numbers)-1))))
-
-# Add points and labels
-points(guess_numbers, all_probabilities_percent, cex=2, col="blue")
-text(guess_numbers, all_probabilities_percent, 
-     labels=sprintf("%.2f%%", all_probabilities_percent), pos=3)
+# Look at the distribution of remaining words after a random first guess
+cat("Summary of remaining words after a random first guess:\n")
+summary(remaining_after_guess)
+cat(sprintf("\nMean: %.1f\n", mean(remaining_after_guess)))
+cat(sprintf("Standard Deviation: %.1f\n", sd(remaining_after_guess)))
 ```
 
-## Probability Theory Analysis
+```{r}
+# Plot the distribution
+hist(remaining_after_guess, breaks = 30, col = "steelblue", 
+     main = "Distribution of Remaining Words After First Guess",
+     xlab = "Number of Remaining Words", ylab = "Frequency")
+abline(v = mean(remaining_after_guess), col = "red", lwd = 2, lty = 2)
+abline(v = mean(remaining_after_guess) + sd(remaining_after_guess), col = "blue", lwd = 2, lty = 2)
+abline(v = mean(remaining_after_guess) - sd(remaining_after_guess), col = "blue", lwd = 2, lty = 2)
+legend("topright", legend = c("Mean", "±1 SD"), col = c("red", "blue"), lty = 2, lwd = 2)
+```
 
-Now let's analyze our results from a probability theory perspective:
+## Using pnorm() to Ask Probability Questions
 
-### 1. Initial Probability Space
+Now that we have a distribution of outcomes, we can use `pnorm()` to answer practical questions. The `pnorm()` function tells us the probability of getting a value at or below a certain point in a normal distribution. It takes three key arguments: the value we're interested in, the mean, and the standard deviation.
 
-In our simplified Wordle, our initial probability space consists of 200 possible target words, each with an equal probability of being the answer. Therefore:
+```{r}
+# Store our mean and sd for easy reference
+avg_remaining <- mean(remaining_after_guess)
+sd_remaining <- sd(remaining_after_guess)
 
-P(correct guess) = 1/200 = 0.005 = 0.5%
+cat(sprintf("Mean remaining words: %.1f\n", avg_remaining))
+cat(sprintf("Standard deviation: %.1f\n", sd_remaining))
+```
 
-### 2. Conditional Probability
+### Question 1: What's the probability of a "great" first guess?
 
-After each guess, we receive feedback that allows us to eliminate words from our consideration. This is an application of conditional probability.
+Let's say a "great" first guess leaves you with 20 or fewer remaining words. How likely is that with a random guess?
 
-Let's define:
-- A = Event that a specific word is the target
-- B = Event that we observe a specific feedback pattern
+```{r}
+# pnorm gives us P(X <= value)
+prob_great <- pnorm(20, mean = avg_remaining, sd = sd_remaining)
+cat(sprintf("Probability of 20 or fewer remaining words: %.4f (%.2f%%)\n", prob_great, prob_great * 100))
+```
 
-We update our probability using Bayes' theorem:
+### Question 2: What's the probability of a "bad" first guess?
 
-P(A|B) = P(B|A) × P(A) / P(B)
+A "bad" guess might leave you with 80 or more remaining words. How likely is that?
 
-In our context:
-- P(A) = 1/n, where n is the number of words before the guess
-- P(B|A) = 1 if the word would produce the observed feedback, 0 otherwise
-- P(B) = m/n, where m is the number of words that would produce the observed feedback
+```{r}
+# For P(X >= value), we use 1 - pnorm() or set lower.tail = FALSE
+prob_bad <- 1 - pnorm(80, mean = avg_remaining, sd = sd_remaining)
+cat(sprintf("Probability of 80 or more remaining words: %.4f (%.2f%%)\n", prob_bad, prob_bad * 100))
 
-This simplifies to:
-P(A|B) = 1/m
+# Equivalently:
+prob_bad_v2 <- pnorm(80, mean = avg_remaining, sd = sd_remaining, lower.tail = FALSE)
+cat(sprintf("Same calculation using lower.tail = FALSE: %.4f (%.2f%%)\n", prob_bad_v2, prob_bad_v2 * 100))
+```
 
-Where m is the number of remaining possible words after filtering based on feedback.
+### Question 3: What range covers the "typical" outcome?
 
-### 3. Information Theory
+What range of remaining words covers the middle 95% of outcomes? This is like asking: between what two values do most first guesses fall?
 
-From an information theory perspective, the optimal first guess should maximize the expected information gain (or entropy reduction). Words containing common letters in common positions tend to provide more information, thus explaining why strategic guesses generally outperform random guesses.
+```{r}
+# The middle 95% falls between the 2.5th and 97.5th percentiles
+# We can use qnorm() (the inverse of pnorm) to find these cutoff points
+lower_bound <- qnorm(0.025, mean = avg_remaining, sd = sd_remaining)
+upper_bound <- qnorm(0.975, mean = avg_remaining, sd = sd_remaining)
 
-### 4. Practical Application
+cat(sprintf("The middle 95%% of first guesses leave between %.0f and %.0f remaining words.\n", 
+            max(0, lower_bound), upper_bound))
+cat(sprintf("Anything outside this range would be unusual.\n"))
+```
 
-In practical terms, this exercise demonstrates:
+### Question 4: How unusual is a specific outcome?
 
-1. The initial probability of guessing the correct word is low (0.5% in our simplified version).
-2. Each informed guess increases this probability by eliminating possibilities.
-3. Strategic first guesses that use common letters typically provide more information.
-4. The probability of success can increase dramatically after just a few well-chosen guesses.
+Let's say someone's first guess left only 10 words remaining. How unusual is that? We can calculate a z-score and use pnorm() to find out.
 
-## Conclusion
+```{r}
+# Calculate the z-score for 10 remaining words
+value <- 10
+z_score <- (value - avg_remaining) / sd_remaining
+prob_at_or_below <- pnorm(value, mean = avg_remaining, sd = sd_remaining)
 
-This exercise has demonstrated several key probability concepts using a simplified version of Wordle:
+cat(sprintf("If a guess leaves %d remaining words:\n", value))
+cat(sprintf("  Z-score: %.2f\n", z_score))
+cat(sprintf("  Probability of this or fewer: %.4f (%.2f%%)\n", prob_at_or_below, prob_at_or_below * 100))
+cat(sprintf("  This means only about %.1f%% of random first guesses do this well or better.\n", prob_at_or_below * 100))
+```
 
-1. **Initial probability space**: With 200 possible words, the initial probability of a correct guess is 0.5%.
+## Comparing Strategies with pnorm()
 
-2. **Conditional probability**: Each guess provides information that allows us to update our probability estimates using Bayes' theorem.
+Now let's simulate many games with the strategic approach and compare distributions.
 
-3. **Information theory**: Strategic guesses using common letters typically provide more information, leading to:
-   - Faster reduction of the possible word space
-   - Higher probabilities of success in subsequent guesses
-   - Fewer guesses required to reach the target word
+```{r}
+# Simulate 1000 games with a strategic first guess ("raise" uses common letters)
+set.seed(42)
+remaining_strategic <- numeric(n_simulations)
 
-4. **Real-world application**: Our simulations showed that starting with a strategic guess improved performance by reducing the average number of guesses required to find the target word.
+for (i in 1:n_simulations) {
+  target <- sample(wordle_db, 1)
+  feedback <- wordle_feedback("raise", target)
+  remaining <- filter_words(wordle_db, "raise", feedback)
+  remaining_strategic[i] <- length(remaining)
+}
 
-This exercise illustrates how probability theory can be applied to develop optimal strategies for games like Wordle, and how making informed choices can significantly improve your chances of success.
+# Compare the two distributions
+cat("Random guessing:\n")
+cat(sprintf("  Mean: %.1f, SD: %.1f\n", mean(remaining_after_guess), sd(remaining_after_guess)))
+cat("\nStrategic guessing ('raise'):\n")
+cat(sprintf("  Mean: %.1f, SD: %.1f\n", mean(remaining_strategic), sd(remaining_strategic)))
+```
+
+```{r}
+# Use pnorm to compare: what's the probability of leaving <= 30 words with each strategy?
+threshold <- 30
+
+prob_random_good <- pnorm(threshold, mean = mean(remaining_after_guess), sd = sd(remaining_after_guess))
+prob_strategic_good <- pnorm(threshold, mean = mean(remaining_strategic), sd = sd(remaining_strategic))
+
+cat(sprintf("Probability of %d or fewer remaining words:\n", threshold))
+cat(sprintf("  Random strategy: %.2f%%\n", prob_random_good * 100))
+cat(sprintf("  Strategic strategy: %.2f%%\n", prob_strategic_good * 100))
+```
+
+```{r}
+# Visualize both distributions side by side
+par(mfrow = c(1, 2))
+
+hist(remaining_after_guess, breaks = 30, col = "steelblue", 
+     main = "Random First Guess", xlab = "Remaining Words", 
+     xlim = c(0, max(remaining_after_guess, remaining_strategic)))
+abline(v = mean(remaining_after_guess), col = "red", lwd = 2, lty = 2)
+
+hist(remaining_strategic, breaks = 30, col = "coral", 
+     main = "Strategic First Guess ('raise')", xlab = "Remaining Words",
+     xlim = c(0, max(remaining_after_guess, remaining_strategic)))
+abline(v = mean(remaining_strategic), col = "red", lwd = 2, lty = 2)
+
+par(mfrow = c(1, 1))
+```
+
+## Key Takeaways
+
+This exercise has demonstrated several important concepts:
+
+1. **Basic probability**: With 200 possible words, each guess starts as a 1-in-200 shot (0.5%). Each piece of feedback narrows the field.
+
+2. **Distributions matter**: When we simulate many games, the number of remaining words after a guess forms a distribution with a mean and standard deviation, just like other data we've worked with.
+
+3. **Using `pnorm()` to answer questions**: Once we know the mean and standard deviation of a distribution, `pnorm()` lets us answer questions like "how likely is this outcome?" or "what percentage of results fall below this value?" It converts any value into a probability based on the normal distribution.
+
+4. **`pnorm()` and z-scores are connected**: Asking `pnorm(x, mean, sd)` is the same as calculating a z-score for x and then looking up that z-score's probability. The z-score tells us *how far* from typical something is; `pnorm()` tells us *how likely* that is.
+
+5. **Comparing strategies**: By looking at the distributions from different strategies, we can use `pnorm()` to quantify how much better one approach is than another — not just in one game, but across many possible outcomes.
