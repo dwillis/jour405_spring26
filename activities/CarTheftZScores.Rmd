@@ -271,3 +271,30 @@ When reporting on these findings, remember to:
 2. **Investigate Causes**: Follow up on unusual values to understand the underlying reasons
 3. **Consider Multiple Metrics**: Look at both raw numbers and population-adjusted figures
 4. **Account for Seasonality**: Consider whether values are unusual compared to the same time of year
+
+
+### How likely is a specific car theft month?
+
+Let's pick the month with the highest total and walk through the process: calculate its z-score, use `pnorm()` to find the probability, then check against the actual data.
+```{r pnorm-specific-month}
+# Find the month with the most car thefts
+highest_month <- car_thefts %>%
+  filter(total == max(total))
+
+cat(sprintf("Month: %s\n", highest_month$month))
+cat(sprintf("Total thefts: %d\n", highest_month$total))
+
+# Step 1: Calculate the z-score
+z <- (highest_month$total - mean(car_thefts$total)) / sd(car_thefts$total)
+cat(sprintf("\nZ-score: %.2f\n", z))
+
+# Step 2: Use pnorm() to find the probability of a month this high or higher
+prob_above <- 1 - pnorm(z)
+cat(sprintf("pnorm() estimate - probability of a month this high or higher: %.4f (%.2f%%)\n", prob_above, prob_above * 100))
+
+# Step 3: Check against the actual data
+actual_prob <- sum(car_thefts$total >= highest_month$total) / nrow(car_thefts)
+cat(sprintf("Actual data - proportion of months this high or higher: %.4f (%.2f%%)\n", actual_prob, actual_prob * 100))
+```
+
+The `pnorm()` estimate and the actual proportion won't match perfectly — `pnorm()` assumes a normal distribution, and real data is never perfectly normal. But they should be in the same ballpark, and the comparison helps us see how well the normal model fits.
