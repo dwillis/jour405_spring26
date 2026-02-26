@@ -1,0 +1,106 @@
+---
+title: "HW8b: Polling Simulation"
+---
+
+In class, you simulated polling estimates for the share of Americans who are religiously unaffiliated — a group that makes up about 36% of the population. In this assignment, you'll run the same simulation for a different group: White Evangelicals, who make up roughly 10% of the population.
+
+That difference matters more than it might seem. When a proportion is close to 50%, samples tend to be pretty well-behaved. When it's much smaller — or much larger — samples can behave differently, especially at small sizes. Your job is to run the simulation, compare what you find to the in-class results, and think carefully about what it means for reporting on religion and politics.
+
+### Task 1: Load the tidyverse
+
+```{r}
+
+```
+
+### Task 2: Load the CES data
+
+Load the CES 2024 religion dataset from the same URL as the in-class activity and save it to a dataframe called `ces`:
+
+`https://raw.githubusercontent.com/dwillis/jour405/refs/heads/main/data/ces_2024_religion.csv`
+
+```{r}
+
+```
+
+### Task 3: Calculate the population proportion
+
+Create a new column called `evangelical` that is `TRUE` if a respondent's `trad` value is `"White Evangelical"` and `FALSE` otherwise. Then calculate the proportion of the full dataset that is White Evangelical and save it as `population_proportion`.
+
+```{r}
+
+```
+
+Write down this value. How does it compare to the unaffiliated proportion (about 0.36) from the in-class activity?
+
+ANSWER HERE
+
+### Task 4: Take a single small sample
+
+Use `set.seed(42)` and sample 50 rows from `ces`. Save it as `sample_50`. Calculate the proportion of White Evangelical respondents in your sample.
+
+```{r}
+
+```
+
+How close is your sample estimate to the population proportion? How does the accuracy compare to what you saw with the unaffiliated group in class?
+
+ANSWER HERE
+
+### Task 5: Take a single larger sample
+
+Use `set.seed(1966)` and sample 500 rows. Save it as `sample_500`. Calculate the proportion of White Evangelical respondents in this sample.
+
+```{r}
+
+```
+
+Did the larger sample improve the estimate? How does the improvement compare to what you saw in class?
+
+ANSWER HERE
+
+### Task 6: Simulate many polls
+
+The code below runs the same simulation as the in-class activity, but using your `evangelical` column. Run it as-is.
+
+```{r}
+set.seed(42)
+
+simulate_polls <- function(data, sample_size, n_simulations = 1000) {
+  proportions <- replicate(n_simulations, {
+    s <- data |> sample_n(sample_size)
+    mean(s$evangelical)
+  })
+  tibble(proportion = proportions, sample_size = sample_size)
+}
+
+simulations_50 <- simulate_polls(ces, 50)
+simulations_500 <- simulate_polls(ces, 500)
+```
+
+### Task 7: Visualize the simulation results
+
+Create two histograms side by side using the code structure from class. Add a vertical line at `population_proportion`. Make sure to update the title and subtitle to reflect that this simulation is about White Evangelicals.
+
+```{r}
+
+```
+
+### Task 8: Reflect on what you see
+
+**Describe the shape of the n=50 histogram.** Is it as symmetric as the unaffiliated histogram from class? Why do you think that is, given that White Evangelicals make up only about 10% of the population?
+
+ANSWER HERE
+
+**Compare the n=50 and n=500 histograms for this group.** How much does the distribution change with a larger sample? Is the improvement bigger or smaller than what you saw in class with the unaffiliated group?
+
+ANSWER HERE
+
+**A news organization wants to report on White Evangelical voters using a poll of 200 people.** Based on your simulations, roughly how many White Evangelical respondents would that poll be likely to include? What does that suggest about the reliability of estimates for smaller subgroups?
+
+ANSWER HERE
+
+**Imagine you are covering the 2028 presidential election and a campaign shares a poll showing White Evangelical support at 78%.** The poll sampled 400 people. Based on everything you've seen in this assignment and in class, what would you want to know before reporting that number?
+
+ANSWER HERE
+
+When finished, save your work, switch to GitHub Desktop, then add, commit and push your changes to GitHub and submit the URL of the notebook in ELMS.
