@@ -13,7 +13,7 @@ In this assignment, you'll be picking up where you left off with the M&Ms activi
 ### Task 3: Sample 5 rows of data from the dataset
 
 
-### Task 4: Calculate the mean age and standard deviation of the sample, using either the blue or white number of M&Ms
+### Task 4: Calculate the mean age and standard deviation of the sample, using either the red or black number of M&Ms
 
 
 ### Task 5: Calculate the mean age and standard deviation of the population, using the same measure as in Task 4
