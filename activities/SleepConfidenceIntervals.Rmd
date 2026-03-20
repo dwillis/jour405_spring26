@@ -1,0 +1,178 @@
+---
+title: "Confidence Intervals with Sleep Data"
+---
+
+```{r setup, include=FALSE}
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
+```
+
+## Are Students Getting Enough Sleep?
+
+The CDC recommends that adults aged 18-25 get at least 7 hours of sleep per night. A campus health reporter wants to know: are students at this university getting enough sleep?
+
+Remember providing the hours you slept the night before our first class? Your job is to analyze this data and determine what we can confidently say about sleep habits across the entire student body.
+
+This is the core challenge of confidence intervals: using a **sample** to make claims about a **population**.
+
+### Task 1: Load the tidyverse and the data
+
+```{r}
+library(tidyverse)
+
+sleep_data <- read_csv("https://raw.githubusercontent.com/dwillis/jour405/refs/heads/main/data/sleep_data.csv")
+
+head(sleep_data)
+```
+
+### Task 2: Calculate descriptive statistics
+
+Let's start with what we know about these students. Calculate the mean, standard deviation and number of observations.
+
+```{r}
+sleep_stats <- sleep_data |>
+  summarise(
+    mean_hours = mean(hours),
+    sd_hours = sd(hours),
+    n = n()
+  )
+
+sleep_stats
+```
+
+**Answer this question:** Based on these numbers alone, what would you tell the health reporter? What's the average? But why might it be risky to report that single number as the definitive answer for all students?
+
+ANSWER HERE
+
+### Task 3: Calculate the standard error
+
+The standard error tells us how much our sample mean would vary if we took many different samples of 37 students. It's the key to moving from "this is what 37 students told us" to "this is what we think is true for the whole campus." The formula is: standard deviation divided by the square root of the sample size.
+
+```{r}
+sleep_stats <- sleep_stats |>
+  mutate(
+    se_hours = sd_hours / sqrt(37)
+  )
+
+sleep_stats
+```
+
+**Answer this question:** The standard error is much smaller than the standard deviation. Why? What does each one measure?
+
+ANSWER HERE
+
+### Task 4: Calculate a 95% confidence interval
+
+Now we'll build our confidence interval. For a 95% CI with a small sample, we use the t-distribution. The `qt(0.975, df = n - 1)` function gives us the critical value — the number of standard errors we go above and below the mean. We multiply critical value by the standard error to get the margin of error, then add/subtract from the mean.
+
+```{r}
+sleep_stats <- sleep_stats |>
+  mutate(
+    t_critical = qt(0.975, df = n - 1),
+    margin_error = t_critical * se_hours,
+    ci_lower = mean_hours - se_hours,
+    ci_upper = mean_hours + se_hours
+  )
+
+sleep_stats |>
+  select(mean_hours, margin_error, ci_lower, ci_upper)
+```
+
+**Answer this question:** Write one sentence explaining what this confidence interval means in plain English that a reader would understand.
+
+ANSWER HERE
+
+### Task 5: Visualize the distribution with the confidence interval
+
+This chart shows the histogram of individual sleep hours, plus the mean (red line) and the 95% confidence interval (blue shaded region). The shaded region is the range where we think the true average for all students falls.
+
+```{r}
+ggplot(sleep_data, aes(x = hours)) +
+  geom_histogram(binwidth = 0.5, fill = "skyblue", color = "white", alpha = 0.7) +
+  geom_vline(xintercept = sleep_stats$mean_hours, color = "red", linewidth = 1) +
+  geom_vline(xintercept = sleep_stats$ci_lower, color = "blue", linetype = "dashed") +
+  geom_vline(xintercept = sleep_stats$ci_upper, color = "blue", linetype = "dashed") +
+  annotate("rect",
+           xmin = sleep_stats$ci_lower,
+           xmax = sleep_stats$ci_upper,
+           ymin = 0, ymax = Inf,
+           fill = "blue", alpha = 0.1) +
+  annotate("text", x = sleep_stats$mean_hours + 0.1, y = 8,
+           label = paste0("Mean: ", round(sleep_stats$mean_hours, 2)),
+           hjust = 0, color = "red", fontface = "bold") +
+  labs(
+    title = "Distribution of Student Sleep Hours",
+    subtitle = paste0("95% Confidence Interval for the mean: [",
+                     round(sleep_stats$ci_lower, 2), ", ",
+                     round(sleep_stats$ci_upper, 2), "]"),
+    x = "Hours of Sleep",
+    y = "Number of Students"
+  ) +
+  theme_minimal()
+```
+
+**Answer this question:** Look at the chart. Notice that the confidence interval is much narrower than the spread of individual data points. Why? What's the difference between the variation in individual sleep hours and the uncertainty about the average?
+
+ANSWER HERE
+
+### Task 6: The CDC question — is 7 hours within the interval?
+
+The CDC recommends at least 7 hours. Based on the confidence interval, can we say students are getting enough sleep? Let's check.
+
+```{r}
+cdc_recommendation <- 7
+
+sleep_stats |>
+  mutate(
+    meets_cdc = if_else(ci_lower >= cdc_recommendation, "Yes - entire CI is at or above 7", "No - CI includes values below 7")
+  ) |>
+  select(mean_hours, ci_lower, ci_upper, meets_cdc)
+```
+
+**Answer this question:** Based on this result, which of these headlines is justified? Why?
+
+  a) "Students Average More Than 7 Hours of Sleep"
+  b) "Students May Not Be Getting Enough Sleep, Survey Suggests"
+  c) "Survey: Students Getting Recommended Amount of Sleep"
+
+ANSWER HERE
+
+### Task 7: What about a bigger sample?
+
+The margin of error depends on the sample size. What if we had surveyed 100 students instead of 37 and got the same mean and standard deviation? Let's recalculate with a hypothetical sample size 100.
+
+```{r}
+hypothetical_n <- 100
+
+hypothetical_stats <- tibble(
+  mean_hours = sleep_stats$mean_hours,
+  sd_hours = sleep_stats$sd_hours,
+  n = hypothetical_n,
+  se_hours = sd_hours / sqrt(hypothetical_n),
+  t_critical = qt(0.975, df = hypothetical_n - 1),
+  margin_error = t_critical * se_hours,
+  ci_lower = mean_hours - margin_error,
+  ci_upper = mean_hours + margin_error
+)
+
+# Compare the two intervals side by side
+comparison <- tibble(
+  sample_size = c(sleep_stats$n, hypothetical_n),
+  margin_error = c(sleep_stats$margin_error, hypothetical_stats$margin_error),
+  ci_lower = c(sleep_stats$ci_lower, hypothetical_stats$ci_lower),
+  ci_upper = c(sleep_stats$ci_upper, hypothetical_stats$ci_upper)
+)
+
+comparison
+```
+
+**Answer this question:** How did the margin of error change? What does this tell you about the relationship between sample size and certainty?
+
+ANSWER HERE
+
+### Task 8: Journalistic interpretation
+
+You now have all the statistics you need. Based on what you've calculated:
+
+Write a headline and a one-paragraph lede for a campus news story about student sleep habits. Your text should accurately reflect the confidence interval — don't overstate or understate the findings.
+
+ANSWER HERE
