@@ -3,7 +3,7 @@ title: "Home Values After Transit Line"
 ---
 
 ```{r setup, include=FALSE}
-knitr::opts_chunk$set(echo = TRUE)
+knitr::opts_chunk$set(echo = TRUE, message = FALSE, warning = FALSE)
 options(scipen=999)
 library(tidyverse)
 ```
@@ -12,16 +12,16 @@ library(tidyverse)
 
 Local officials have claimed that a new light rail line has increased property values in a local neighborhood.
 
-Before the transit line opened, homes in that neighborhood sold for an average of $285,000, with a standard deviation of $32,000.
+Before the transit line opened, homes in that neighborhood sold for an average of **$285,000**, with a standard deviation of **$32,000**.
 
 Since the extension opened, your news team collected sales data from 14 recent home sales in the neighborhood:
 $297,000, $305,000, $292,000, $318,000, $290,000, $311,000, $299,000, $325,000, $302,000, $288,000, $307,000, $315,000, $320,000, $294,000
 
-As a journalist, you need to determine: **Is there statistical evidence that the transit line has actually increased home values?**
+As a journalist, you need to determine: **Is there statistical evidence that the transit line has actually increased home values? And if so, by how much?**
 
 Follow along, running the code when directed. If you have questions, ask either in class or put them just below the section you have a question about.
 
-## Task 1: Organize your data
+### Task 1: Organize your data
 
 ```{r}
 # Known information about home values before the transit line
@@ -42,23 +42,28 @@ home_data <- tibble(
 home_data
 ```
 
-## Task 2: Calculate key statistics
+### Task 2: Calculate key statistics (1 point)
+
+Replace the REPLACE_ME values to calculate the mean, standard deviation and count of the new home prices.
 
 ```{r}
-# Calculate statistics on the new home price data
 new_stats <- home_data |> 
   summarise(
-    mean = mean(sale_price),
-    sd = sd(sale_price),
-    n = n(),
-    min = min(sale_price),
-    max = max(sale_price)
+    mean = mean(REPLACE_ME),
+    sd = sd(REPLACE_ME),
+    n = n()
   )
 
 new_stats
 ```
 
-## Task 3: Make a chart
+**Answer this question:** How does the new average compare to the prior average of $285,000? How much higher is it in dollar terms? Does that seem like a big difference to you? What else would you want to know?
+
+ANSWER HERE
+
+### Task 3: Visualize the distribution (1 point)
+
+Let's make a histogram of the new home prices with a reference line showing the old average. This helps us see the spread of the data and where the prior average falls relative to the new sales.
 
 ```{r}
 # Function to format currency values
@@ -66,97 +71,133 @@ dollar_format <- function(x) {
   paste0("$", format(x/1000, big.mark=","), "K")
 }
 
-# Create a visualization of home prices with reference to previous average
-ggplot(home_data, aes(x = reorder(sale_id, sale_price), y = sale_price)) +
-  geom_col(fill = "seagreen", alpha = 0.8) +
-  geom_hline(yintercept = prior_mean, color = "darkred", size = 1, linetype = "dashed") +
-  annotate("text", x = 3, y = prior_mean - 8000, 
-           label = "Previous Average ($285K)", hjust = 0, fontface = "bold", color = "darkred") +
-  scale_y_continuous(labels = dollar_format) +
+ggplot(home_data, aes(x = sale_price)) +
+  geom_histogram(binwidth = 5000, fill = "seagreen", color = "white", alpha = 0.8) +
+  geom_vline(xintercept = prior_mean, color = "darkred", size = 1.2, linetype = "dashed") +
+  geom_vline(xintercept = new_stats$mean, color = "darkblue", size = 1.2) +
+  annotate("text", x = prior_mean - 1000, y = 3.5,
+           label = "Previous Avg ($285K)", hjust = 1, fontface = "bold", color = "darkred") +
+  annotate("text", x = new_stats$mean + 1000, y = 3,
+           label = paste0("New Avg (", dollar_format(new_stats$mean), ")"), 
+           hjust = 0, fontface = "bold", color = "darkblue") +
+  scale_x_continuous(labels = dollar_format) +
   labs(
-    title = "Home Sales After Transit Line",
-    subtitle = "Horizontal line shows previous neighborhood average of $285,000",
-    x = "Recent Home Sales",
-    y = "Sale Price",
+    title = "Home Sales After Transit Line Extension",
+    subtitle = "Dashed line shows previous neighborhood average of $285,000",
+    x = "Sale Price",
+    y = "Number of Sales",
     caption = "Source: County Property Records"
   ) +
   theme_minimal() +
   theme(
     plot.title = element_text(face = "bold", size = 14),
-    plot.subtitle = element_text(size = 10),
-    axis.text.x = element_blank(),
-    axis.ticks.x = element_blank()
+    plot.subtitle = element_text(size = 10)
   )
 ```
 
-## Task 4: Perform a hypothesis test
+**Answer this question:** Look at where the old average (red dashed line) falls relative to the new sales. How many of the 14 homes sold for more than the old average? What does the histogram tell you about the spread of the new prices?
 
-This is where we formally test the officials' claim that the transit line has increased home values.
+ANSWER HERE
+
+### Task 4: Set up and perform a hypothesis test (2 points)
+
+This is where we formally test the officials' claim. Fill in the REPLACE_ME values for the hypotheses and the t-test.
 
 **Hypotheses:**
-- H₀: μ ≤ $285,000 (The transit line has not increased home values)
-- H₁: μ > $285,000 (The transit line has increased home values)
+
+- **H₀ (Null):** REPLACE_ME
+- **H₁ (Alternative):** REPLACE_ME
 
 ```{r}
+# Set the significance level
+alpha <- REPLACE_ME
+
 # Perform a one-sample t-test
-# Since we want to know if home values increased, we use a one-sided test (alternative = "greater")
+# Since we want to know if home values INCREASED, we use alternative = "greater"
 t_test_result <- t.test(
   home_data$sale_price,
-  mu = prior_mean,
+  mu = REPLACE_ME,
   alternative = "greater"
 )
 
-# Display the results
 t_test_result
 ```
 
-## Task 5: Interpreting the results for your story
+**Answer this question:** Look at the p-value. Is it less than our alpha of 0.05? What does this mean for our null hypothesis — can we reject it? What can we now say about the officials' claim?
+
+ANSWER HERE
+
+### Task 5: Interpret the results with a confidence interval (2 points)
+
+Remember confidence intervals from last week? The t-test gives us one too. Let's pull together the key statistics for your story.
 
 ```{r}
 # Extract the p-value
 p_value <- t_test_result$p.value
 
-# Calculate the 95% confidence interval
+# Calculate the 95% confidence interval (two-sided for the full range)
 ci <- t.test(home_data$sale_price)$conf.int
 
-# Format and display the confidence interval in a readable way
-ci_formatted <- tibble(
-  `Lower bound` = dollar_format(ci[1]),
-  `Upper bound` = dollar_format(ci[2]),
-  `Confidence level` = "95%"
-)
-
-# Display as a nice table
-ci_formatted
-
-# Set our significance level
-alpha <- 0.05
-
-# Compare and make a decision
-if(p_value < alpha) {
-  conclusion <- "The data provides statistical evidence supporting the claim that the transit line has increased home values."
-} else {
-  conclusion <- "The data does not provide strong statistical evidence that the transit line has increased home values."
-}
-
-# Create a tibble to display the key statistics for your story
+# Key statistics for your story
 story_stats <- tibble(
   `Previous average` = dollar_format(prior_mean),
   `New average` = dollar_format(mean(new_prices)),
   `Increase` = dollar_format(mean(new_prices) - prior_mean),
   `Percent change` = paste0(round(((mean(new_prices) - prior_mean) / prior_mean) * 100, 1), "%"),
   `p-value` = p_value,
-  `Statistically significant?` = if_else(p_value < alpha, "Yes", "No")
+  `95% CI lower` = dollar_format(ci[1]),
+  `95% CI upper` = dollar_format(ci[2]),
+  `Significant?` = if_else(p_value < alpha, "Yes", "No")
 )
 
-# Display the key statistics
 story_stats
-
-print(conclusion)
-
 ```
 
-## Task 6: What's the story?
+**Answer this question:** The 95% confidence interval tells us the range where the true average home price likely falls. Does that range include the old average of $285,000? What does that tell you?
 
-After disucssion the results, each person writes a couple of sentences for the top of a story about local officials' claims on the impact of the transit line and what the data says. Remember that there are lots of possible reasons that could influence the price of a home. Make your sentences newsy.
+ANSWER HERE
 
+### Task 6: Calculate the effect size (3 points)
+
+We've established that the increase is statistically significant — it's real, not due to chance. But how big is it, really? We'll calculate Cohen's d to find out. The formula is:
+
+**d = (new mean - prior mean) / prior standard deviation**
+
+Replace the REPLACE_ME values.
+
+```{r}
+effect_size <- (mean(new_prices) - REPLACE_ME) / REPLACE_ME
+
+effect_size_label <- case_when(
+  abs(effect_size) < 0.2 ~ "Negligible",
+  abs(effect_size) < 0.5 ~ "Small",
+  abs(effect_size) < 0.8 ~ "Medium",
+  TRUE ~ "Large"
+)
+
+tibble(
+  `Cohen's d` = round(effect_size, 3),
+  `Interpretation` = effect_size_label,
+  `Dollar increase` = dollar_format(mean(new_prices) - prior_mean),
+  `Percent increase` = paste0(round(((mean(new_prices) - prior_mean) / prior_mean) * 100, 1), "%")
+)
+```
+
+**Answer this question:** The effect size is "medium." In dollar terms, the average increase is about $19,500. But remember that the standard deviation of home prices in this neighborhood was $32,000 *before* the transit line — meaning prices already varied by tens of thousands of dollars from sale to sale. Given that context, does a $19,500 increase seem large or modest? How does the effect size help you think about this differently than just looking at the dollar amount?
+
+ANSWER HERE
+
+### Task 7: What's the story? (6 points)
+
+You now have all the statistical evidence. But writing the story requires more than numbers — it requires judgment.
+
+**Part A:** The local officials are going to claim the transit line increased home values. Based on your analysis, is that claim supported? Write 2-3 sentences for the top of your story that accurately reflect both the statistical significance AND the effect size. Don't just echo the officials' talking points — interrogate them.
+
+ANSWER HERE
+
+**Part B:** A $19,500 increase is real and statistically significant, but what *else* could explain rising home prices in this neighborhood? List at least two alternative explanations that a good reporter would want to investigate before attributing the increase entirely to the transit line.
+
+ANSWER HERE
+
+
+When you are finished, save your work, switch to GitHub Desktop, then add, commit and push your changes to GitHub and submit the URL of the notebook in ELMS.

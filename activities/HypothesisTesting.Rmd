@@ -1,42 +1,30 @@
 ---
-title: "Hypothesis Testing: Did Crime Rates Change After a New Policy?"
-output:
-  html_document:
-    toc: true
-    toc_float: true
-    theme: cosmo
-    highlight: tango
+title: "Hypothesis Testing & Effect Size"
 ---
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE, warning = FALSE, message = FALSE)
 ```
 
-## Introduction
+## Did Community Policing Actually Improve Response Times?
 
-Hypothesis testing is a statistical method that helps journalists answer questions like "Is this change real, or could it have happened by chance?" In this activity, we'll investigate whether a city's new community policing initiative actually reduced response times to emergency calls.
+The city of Westbrook implemented a new community policing program in January. The police chief claims the program has improved emergency response times. Before the program, the average response time was **8.2 minutes** with a standard deviation of **1.5 minutes**. You've collected data from 20 randomly selected emergency calls after the program started.
 
-**The Scenario:** The city of Westbrook implemented a new community policing program in January. The police chief claims that the program has improved emergency response times. Before the program, the average response time was 8.2 minutes with a standard deviation of 1.5 minutes. You've collected data from 20 randomly selected emergency calls after the program started.
+Your editor wants to know two things: Is the improvement real? And is it big enough to matter?
 
-## Step 1: Load Required Libraries
+### Task 1: Load the tidyverse
 
 ```{r}
 library(tidyverse)
 ```
 
-## Step 2: Understanding Hypothesis Testing
+### Task 2: Set up the data and the hypotheses (2 points)
 
-Before we analyze data, let's understand the framework:
+Before we run any tests, we need to state our hypotheses. The null hypothesis is what we assume to be true until we have evidence otherwise — like "innocent until proven guilty." Fill in the REPLACE_ME values.
 
-**Null Hypothesis (H₀):** The new program had NO effect on response times. Any difference we see is due to random chance.
+**Null Hypothesis (H₀):** REPLACE_ME
 
-**Alternative Hypothesis (H₁):** The new program DID reduce response times. The difference we observe is real.
-
-**Alpha Level (α):** We'll use 0.05, meaning we're willing to accept a 5% chance of being wrong when we reject the null hypothesis.
-
-## Step 3: Create the Dataset
-
-Let's create our dataset of post-program response times.
+**Alternative Hypothesis (H₁):** REPLACE_ME
 
 ```{r}
 # Response times (in minutes) after the community policing program
@@ -50,7 +38,6 @@ response_times <- c(
 # Known baseline (before the program)
 baseline_mean <- 8.2
 baseline_sd <- 1.5
-alpha <- 0.05
 
 # Create a tibble
 response_data <- tibble(
@@ -58,189 +45,142 @@ response_data <- tibble(
   response_time = response_times
 )
 
-# View the data
 response_data
 ```
 
-## Step 4: Calculate Summary Statistics
+### Task 3: Calculate summary statistics (1 point)
+
+Let's see what the new response times look like. Replace the REPLACE_ME values.
 
 ```{r}
-# Calculate summary statistics for the new response times
 summary_stats <- response_data |>
   summarize(
     sample_size = n(),
-    sample_mean = mean(response_time),
-    sample_sd = sd(response_time),
-    standard_error = sample_sd / sqrt(sample_size),
-    min_time = min(response_time),
-    max_time = max(response_time)
+    sample_mean = mean(REPLACE_ME),
+    sample_sd = sd(REPLACE_ME),
+    standard_error = sample_sd / sqrt(sample_size)
   )
 
 summary_stats
 ```
 
-**Key Observations:**
-- Sample mean: `r round(summary_stats$sample_mean, 2)` minutes
-- This is `r round(baseline_mean - summary_stats$sample_mean, 2)` minutes faster than the baseline of `r baseline_mean` minutes
+**Answer this question:** The sample mean is lower than the baseline of 8.2 minutes. How much lower? Does that seem like a meaningful improvement to you, just based on the numbers? What would you want to know before deciding?
 
-But is this difference *statistically significant*, or could it have occurred by chance?
+ANSWER HERE
 
-## Step 5: Perform a One-Sample t-Test
+### Task 4: Perform a one-sample t-test (2 points)
 
-Since we're testing whether the new times are *lower* than the baseline, we use a one-sided test.
+Now we formally test the police chief's claim. Since we're testing whether response times *decreased*, we use a one-sided test (`alternative = "less"`). Replace the REPLACE_ME with the baseline mean we're comparing against.
 
 ```{r}
+# Set our significance level
+alpha <- REPLACE_ME
+
 # Perform the t-test
 t_test_result <- t.test(
   response_data$response_time,
-  mu = baseline_mean,
-  alternative = "less"  # We expect times to be LESS (faster)
+  mu = REPLACE_ME,
+  alternative = "less"
 )
 
 t_test_result
 ```
 
-## Step 6: Interpret the Results
+### Task 5: Interpret the t-test results (2 points)
+
+Let's pull out the key numbers. Look at the p-value: is it less than our alpha of 0.05?
 
 ```{r}
 # Extract key values
-t_statistic <- t_test_result$statistic
 p_value <- t_test_result$p.value
-conf_interval <- t_test_result$conf.int
 
-# Create interpretation
-interpretation <- tibble(
-  Metric = c(
-    "Baseline Mean (before program)",
-    "Sample Mean (after program)",
-    "Difference",
-    "t-statistic",
-    "p-value",
-    "Significant at α = 0.05?"
-  ),
-  Value = c(
-    paste(baseline_mean, "minutes"),
-    paste(round(summary_stats$sample_mean, 2), "minutes"),
-    paste(round(baseline_mean - summary_stats$sample_mean, 2), "minutes faster"),
-    round(t_statistic, 3),
-    format(p_value, scientific = FALSE, digits = 4),
-    ifelse(p_value < alpha, "Yes - Reject null hypothesis", "No - Fail to reject null hypothesis")
-  )
+results <- tibble(
+  `Baseline mean` = paste(baseline_mean, "minutes"),
+  `New mean` = paste(round(summary_stats$sample_mean, 2), "minutes"),
+  `Difference` = paste(round(baseline_mean - summary_stats$sample_mean, 2), "minutes"),
+  `p-value` = round(p_value, 6),
+  `Significant?` = if_else(p_value < alpha, "Yes - reject null hypothesis", "No - fail to reject")
 )
 
-knitr::kable(interpretation, caption = "Hypothesis Test Results")
+results
 ```
 
-## Step 7: Visualize the Test
+**Answer this question:** Based on the p-value, can we reject the null hypothesis? What does this tell the police chief — and what does it NOT tell him?
+
+ANSWER HERE
+
+### Task 6: Visualize the results
 
 ```{r}
-# Create a visualization showing the distribution and our sample mean
 ggplot(response_data, aes(x = response_time)) +
-  geom_histogram(aes(y = after_stat(density)), bins = 10, fill = "steelblue", alpha = 0.7) +
+  geom_histogram(binwidth = 0.2, fill = "steelblue", color = "white", alpha = 0.7) +
   geom_vline(xintercept = baseline_mean, color = "red", linetype = "dashed", size = 1.2) +
   geom_vline(xintercept = summary_stats$sample_mean, color = "darkgreen", size = 1.2) +
-  annotate("text", x = baseline_mean + 0.1, y = 0.8,
+  annotate("text", x = baseline_mean + 0.05, y = 4,
            label = paste("Baseline:", baseline_mean),
            color = "red", hjust = 0, fontface = "bold") +
-  annotate("text", x = summary_stats$sample_mean - 0.1, y = 0.7,
+  annotate("text", x = summary_stats$sample_mean - 0.05, y = 3.5,
            label = paste("New Mean:", round(summary_stats$sample_mean, 2)),
            color = "darkgreen", hjust = 1, fontface = "bold") +
   labs(
     title = "Emergency Response Times: Before vs. After Community Policing",
-    subtitle = paste0("p-value = ", round(p_value, 4),
-                      ifelse(p_value < 0.05, " (Statistically Significant)", " (Not Significant)")),
+    subtitle = paste0("p-value = ", round(p_value, 6)),
     x = "Response Time (minutes)",
-    y = "Density"
+    y = "Number of Calls"
   ) +
-  theme_minimal() +
-  theme(plot.title = element_text(face = "bold"))
+  theme_minimal()
 ```
 
-## Step 8: Two-Sample t-Test Example
+### Task 7: Calculate the effect size (3 points)
 
-Sometimes we want to compare two groups directly rather than comparing to a known baseline. Let's compare response times between two different neighborhoods.
+The t-test told us the improvement is statistically significant — it's real, not due to chance. But is it *meaningful*? That's what effect size measures. We'll calculate **Cohen's d**, which tells us how large the difference is in standard deviation units.
+
+The formula is: d = (baseline mean - sample mean) / baseline standard deviation
+
+Replace the REPLACE_ME values.
 
 ```{r}
-# Create data for two neighborhoods
-neighborhood_data <- tibble(
-  neighborhood = c(rep("Downtown", 15), rep("Suburbs", 15)),
-  response_time = c(
-    # Downtown times
-    7.2, 6.8, 7.5, 7.1, 6.9, 7.3, 7.0, 6.7, 7.4, 7.2, 6.8, 7.1, 7.0, 6.9, 7.3,
-    # Suburban times
-    9.1, 8.7, 9.3, 8.9, 9.5, 8.8, 9.2, 9.0, 8.6, 9.4, 9.1, 8.8, 9.3, 9.0, 8.9
-  )
+effect_size <- (REPLACE_ME - summary_stats$sample_mean) / REPLACE_ME
+
+effect_size_interpretation <- case_when(
+  abs(effect_size) < 0.2 ~ "Negligible",
+  abs(effect_size) < 0.5 ~ "Small",
+  abs(effect_size) < 0.8 ~ "Medium",
+  TRUE ~ "Large"
 )
 
-# View summary by neighborhood
-neighborhood_data |>
-  group_by(neighborhood) |>
-  summarize(
-    mean_time = mean(response_time),
-    sd_time = sd(response_time),
-    n = n()
-  )
-```
-
-```{r}
-# Two-sample t-test
-two_sample_test <- t.test(response_time ~ neighborhood, data = neighborhood_data)
-two_sample_test
-```
-
-```{r}
-# Visualize the comparison
-ggplot(neighborhood_data, aes(x = neighborhood, y = response_time, fill = neighborhood)) +
-  geom_boxplot(alpha = 0.7) +
-  geom_jitter(width = 0.2, alpha = 0.5) +
-  scale_fill_manual(values = c("Downtown" = "steelblue", "Suburbs" = "coral")) +
-  labs(
-    title = "Emergency Response Times by Neighborhood",
-    subtitle = paste("Two-sample t-test p-value:", format(two_sample_test$p.value, scientific = TRUE, digits = 3)),
-    x = "Neighborhood",
-    y = "Response Time (minutes)"
-  ) +
-  theme_minimal() +
-  theme(legend.position = "none")
-```
-
-## Step 9: Understanding P-Values
-
-The p-value answers: **If there were truly no difference, what's the probability of seeing results as extreme as ours?**
-
-```{r}
-# Create a table explaining p-value interpretation
-p_value_guide <- tibble(
-  `P-value Range` = c("p < 0.001", "0.001 ≤ p < 0.01", "0.01 ≤ p < 0.05", "p ≥ 0.05"),
-  `Interpretation` = c(
-    "Very strong evidence against null hypothesis",
-    "Strong evidence against null hypothesis",
-    "Moderate evidence against null hypothesis",
-    "Insufficient evidence to reject null hypothesis"
-  ),
-  `Typical Description` = c(
-    "Highly significant",
-    "Very significant",
-    "Significant",
-    "Not significant"
-  )
+tibble(
+  `Cohen's d` = round(effect_size, 3),
+  `Interpretation` = effect_size_interpretation,
+  `Difference in minutes` = round(baseline_mean - summary_stats$sample_mean, 2),
+  `Difference in seconds` = round((baseline_mean - summary_stats$sample_mean) * 60, 0)
 )
-
-knitr::kable(p_value_guide, caption = "Guide to Interpreting P-values")
 ```
 
-## Conclusion: Writing the Story
+**Answer this question:** The result is statistically significant, but the effect size is small. In practical terms, the improvement is about 25 seconds per call. The police chief is claiming success. Would you write a story saying the program works? How would you frame the findings honestly — acknowledging both that the improvement is real AND that it's small?
 
-Based on our analysis:
+ANSWER HERE
 
-**For the one-sample test (community policing program):**
-- The mean response time decreased from `r baseline_mean` minutes to `r round(summary_stats$sample_mean, 2)` minutes
-- This represents a `r round((baseline_mean - summary_stats$sample_mean) / baseline_mean * 100, 1)`% improvement
-- The p-value of `r round(p_value, 4)` is `r ifelse(p_value < 0.05, "less", "greater")` than 0.05
-- `r ifelse(p_value < 0.05, "We have statistical evidence that the program improved response times", "We cannot conclude the program made a significant difference")`
+### Task 8: The journalist's framework (5 points)
 
-**For the two-sample test (neighborhood comparison):**
-- Downtown response times (mean: `r round(mean(neighborhood_data$response_time[neighborhood_data$neighborhood == "Downtown"]), 1)` min) are significantly faster than suburban times (mean: `r round(mean(neighborhood_data$response_time[neighborhood_data$neighborhood == "Suburbs"]), 1)` min)
-- This difference is statistically significant (p < 0.001)
+The videos you watched describe two questions you need to ask about any statistical result:
 
-**Remember:** Statistical significance tells us whether an effect exists, but not whether it matters. In the next activity, we'll learn about effect size to measure how meaningful these differences actually are.
+1. **Is it statistically significant?** (Is the result unlikely to be due to chance?)
+2. **Is it meaningfully significant?** (Is the effect large enough to matter?)
+
+Apply this framework to the community policing data:
+
+**Question 1:** Write 1-2 sentences answering whether the result is statistically significant and how you know.
+
+ANSWER HERE
+
+**Question 2:** Write 1-2 sentences answering whether the result is meaningfully significant. Consider: the program cost the city $2 million to implement. Is a 25-second improvement in response times worth that investment? What context would you need to answer that question?
+
+ANSWER HERE
+
+**Question 3:** Write a headline and a 2-3 sentence lede for a story about these findings. Your text should accurately reflect both the statistical significance and the effect size — don't let the police chief's framing drive the story if the data tells a more nuanced one.
+
+ANSWER HERE
+
+
+When you are finished, save your work, switch to GitHub Desktop, then add, commit and push your changes to GitHub and submit the URL of the notebook in ELMS.

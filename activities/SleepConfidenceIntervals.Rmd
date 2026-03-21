@@ -39,7 +39,7 @@ sleep_stats <- sleep_data |>
 sleep_stats
 ```
 
-**Answer this question:** Based on these numbers alone, what would you tell the health reporter? What's the average? But why might it be risky to report that single number as the definitive answer for all students?
+**Answer this question:** Based on these numbers alone, what would you tell the health reporter? Why might it be risky to report the average as the definitive answer for all students?
 
 ANSWER HERE
 
