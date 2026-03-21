@@ -1,160 +1,79 @@
 ---
-title: "Car Thefts Significance"
+title: "HW10: Significance Testing & Effect Size"
 name: REPLACE WITH YOUR NAME
 ---
 
-Your editor wants to know if there have been recent changes in the number of car thefts in Prince George's County. Using monthly figures and significance testing, you'll come up with an answer and decide whether there's a story here. As with the previous homework, provide answers in this notebook when prompted and you will have to fill in values where you see REPLACE_ME. Get started by loading the tidyverse in a new R block.
+You previously calculated the mean, margin of error and confidence interval for monthly car thefts in Prince George's County. Your editor now wants to know: it _looks_ like car thefts are decreasing lately, but is that change real, and how big is it? In this assignment, you'll use significance testing and effect size to answer those questions. Load the tidyverse and the data to get started.
 
-### Task 1: Load the tidyverse
+### Task 1: Load the tidyverse and the data
 
 ```{r setup, include=FALSE}
 knitr::opts_chunk$set(echo = TRUE)
 # LOAD THE TIDYVERSE
 ```
 
-
-### Task 2: Load the Prince George's county crime data and generate car thefts totals by month
-
 ```{r}
 
 # Read the data
-car_thefts <- read_csv("https://raw.githubusercontent.com/dwillis/jour405/refs/heads/main/data/car_thefts_month.csv")  |> 
+car_thefts <- read_csv("https://raw.githubusercontent.com/dwillis/jour405/refs/heads/main/data/car_thefts_month.csv") |>
   arrange(month)  # Sort by date
 
-# Basic inspection of the data
-glimpse(car_thefts)
-
 ```
 
-### Task 3: Let's make a chart and describe the results.
+### Task 2: Split the data and test for significance (4 points)
 
-We'll make a line chart using geom_line() to try and illustrate any trend over time. What's your initial reaction to the change in car thefts? Is there a trend?
+We'll split the monthly data into two halves, and then ask whether there's a statistically significant difference between these periods. To do that, we'll use a t-test with our alpha at 0.05. First, fill in the hypotheses, then replace the REPLACE_ME values in the code.
 
-PUT ANSWERS HERE
+**Null Hypothesis:** REPLACE_ME
 
-```{r}
-
-car_thefts |> 
-ggplot(aes(x = month, y = total)) +
-  geom_line(color = "steelblue", size = 1) +
-  geom_point(color = "darkblue", size = 3) +
-  labs(
-    title = "Monthly Car Thefts (July 2023 - February 2025)",
-    subtitle = "Is there a trend over time?",
-    x = "Month",
-    y = "Number of Car Thefts"
-  ) +
-  theme_minimal() +
-  theme(
-    plot.title = element_text(face = "bold", size = 14),
-    axis.title = element_text(face = "bold")
-  )
-
-```
-
-### Task 4: Add the mean, standard error and calculate a margin of error based on a 95% confidence interval
-
-Let's add some stats to that process - mean and standard deviation - and calculate the standard error and 95% confidence intervals. We only have a small number of months, so we'll calculate the margin of error to account for that. 
-
-```{r}
-
-theft_summary <- car_thefts |> 
-  summarize(
-    mean_thefts = mean(total),
-    sd_thefts = sd(REPLACE_ME),
-    months = n(),
-    se_thefts = sd_thefts / sqrt(months),
-    margin_error = qt(0.975, df = months - 1) * se_thefts,  # Using t-distribution for small sample
-    ci_lower = mean_thefts - margin_error,
-    ci_upper = mean_thefts + margin_error
-  )
-
-# Display the confidence interval
-theft_summary
-```
-
-
-
-
-### Task 5: Visualize the data
-
-Let's make a better chart showing the changes and the statistics we produced in Task 4. Does this change anything about your answer from Task 3?
-
-
-
-```{r}
-# Make a better chart
-car_thefts |> 
-ggplot(aes(x = month, y = total)) +
-  geom_line(color = "steelblue", alpha = 0.7) +
-  geom_point(size = 2) +
-  geom_hline(yintercept = theft_summary$mean_thefts, linetype = "dashed", color = "red", size = 1) +
-  geom_ribbon(aes(ymin = theft_summary$ci_lower, ymax = theft_summary$ci_upper), 
-              fill = "red", alpha = 0.2) +
-  annotate("text", x = min(car_thefts$month), 
-           y = theft_summary$mean_thefts + 10, 
-           label = paste0("Mean: ", round(theft_summary$mean_thefts, 1)), 
-           hjust = 0, color = "red") +
-  labs(
-    title = "Monthly Car Thefts with 95% Confidence Interval for the Mean",
-    x = "Month",
-    y = "Number of Car Thefts"
-  ) +
-  theme_minimal()
-
-```
-
-### Task 6: Describe the confidence interval.
-
-- What does the 95% confidence interval show here?
-- What figure(s) accurately reflects the number of car thefts in a typical month?
-- Propose a headline about the trend in car thefts that is focused on the present and future, but informed by the data you see above.
-
-PUT YOUR ANSWERS HERE.
-
-
-### Task 7: Is the recent trend significant?
-
-It _looks_ like car thefts are decreasing lately. But is that change real? We'll split the monthly data into two halves, and then ask if whether there's a statistically significant difference between these periods. To do that, we'll use a t-test with our alpha at 0.05 and develop a null hypothesis and an alternative hypothesis for this scenario.
-
-Null Hypothesis: there is no real difference between the two periods
-Alternative Hypothesis: there is a real difference between the two periods
+**Alternative Hypothesis:** REPLACE_ME
 
 ```{r}
 
 # Find the halfway point and add a column placing each month in the first or second halves
 
 midpoint <- ceiling(nrow(car_thefts) / 2)
-car_thefts <- car_thefts |> 
+car_thefts <- car_thefts |>
   mutate(period = if_else(row_number() <= midpoint, "First Half", "Second Half"))
 
-# Perform t-test comparing the two time periods - this is a two-sided test because we have two periods
+# Perform t-test comparing the two time periods
 t_test_periods <- t.test(total ~ period, data = car_thefts)
 
 # Display results
 t_test_periods
 
-# Visualize the comparison
-period_summary <- car_thefts |> 
-  group_by(period) |> 
+```
+
+**Answer this question:** What is the p-value? Is it less than 0.05? Can we reject the null hypothesis? What does this tell your editor?
+
+PUT ANSWERS HERE
+
+### Task 3: Visualize the comparison (4 points)
+
+Let's see the two periods side by side with their confidence intervals. Replace the REPLACE_ME values.
+
+```{r}
+# Summarize by period
+period_summary <- car_thefts |>
+  group_by(period) |>
   summarize(
     mean_thefts = mean(REPLACE_ME),
     sd_thefts = sd(total),
     months = n(),
     se_thefts = sd_thefts / sqrt(months),
-    margin_error = qt(0.975, df = REPLACE_ME - 1) * se_thefts, # look at how we calculated this above
+    margin_error = qt(0.975, df = REPLACE_ME - 1) * se_thefts,
     ci_lower = mean_thefts - margin_error,
     ci_upper = mean_thefts + margin_error
   )
 
-period_summary |> 
+period_summary |>
 ggplot(aes(x = period, y = mean_thefts, fill = period)) +
   geom_col() +
   geom_errorbar(aes(ymin = ci_lower, ymax = ci_upper), width = 0.2) +
   geom_text(aes(label = round(mean_thefts, 1)), vjust = -0.5, size = 4) +
   labs(
-    title = "Comparing Car Thefts: First Half vs. Second Half of Data Period",
-    subtitle = paste0("p-value = ", round(t_test_periods$p.value, 3)),
+    title = "Comparing Car Thefts: First Half vs. Second Half",
+    subtitle = paste0("p-value = ", round(t_test_periods$p.value, 5)),
     x = "Time Period",
     y = "Average Number of Car Thefts"
   ) +
@@ -164,14 +83,66 @@ ggplot(aes(x = period, y = mean_thefts, fill = period)) +
 
 ```
 
-### Task 8: Reflection
-
-Given the above chart, is the difference between the two periods statistically significant? Can we reject the null hypothesis?
-
-How would you revise your headline from Task 6, if at all? What would you tell your editor, and what would you expect her to ask you?
+**Answer this question:** Look at the error bars (confidence intervals) on the chart. Do they overlap? What does that tell you about whether the difference between the two periods is real?
 
 PUT ANSWERS HERE
 
+### Task 4: Calculate the effect size (5 points)
 
+We've established that the decline is statistically significant. But how large is it? Let's calculate Cohen's d to measure the effect size. For a two-sample comparison, we use the pooled standard deviation:
 
-When you are finished, add, commit and push your notebook and submit the URL in ELMS.
+**Pooled SD** = sqrt(((n1 - 1) × sd1² + (n2 - 1) × sd2²) / (n1 + n2 - 2))
+
+**Cohen's d** = (mean1 - mean2) / pooled SD
+
+Replace the REPLACE_ME values. You'll need to pull the values from `period_summary`.
+
+```{r}
+# Extract the values from period_summary
+first_half_stats <- period_summary |> filter(period == "First Half")
+second_half_stats <- period_summary |> filter(period == "Second Half")
+
+# Calculate pooled standard deviation
+pooled_sd <- sqrt(
+  ((first_half_stats$months - 1) * first_half_stats$sd_thefts^2 +
+   (second_half_stats$months - 1) * second_half_stats$sd_thefts^2) /
+  (first_half_stats$months + second_half_stats$months - REPLACE_ME)
+)
+
+# Calculate Cohen's d
+cohens_d <- (first_half_stats$mean_thefts - REPLACE_ME) / pooled_sd
+
+# Interpret it
+effect_label <- case_when(
+  abs(cohens_d) < 0.2 ~ "Negligible",
+  abs(cohens_d) < 0.5 ~ "Small",
+  abs(cohens_d) < 0.8 ~ "Medium",
+  TRUE ~ "Large"
+)
+
+tibble(
+  `First half mean` = round(first_half_stats$mean_thefts, 1),
+  `Second half mean` = round(second_half_stats$mean_thefts, 1),
+  `Difference` = round(first_half_stats$mean_thefts - second_half_stats$mean_thefts, 1),
+  `Cohen's d` = round(cohens_d, 3),
+  `Interpretation` = effect_label
+)
+```
+
+**Answer this question:** How would you describe this effect size? Compare it to the effect sizes we calculated in class (the response times activity had a small effect, the housing prices activity had a medium effect). What does a large effect size mean for the story you'd write about car thefts?
+
+PUT ANSWERS HERE
+
+### Task 5: Putting it all together (7 points)
+
+You now have three pieces of evidence: the confidence intervals from last week, the significance test from this assignment, and the effect size.
+
+1. In Part 1, your editor asked "just tell me if car thefts are going up or down". Now you have significance testing. Write 2-3 sentences telling your editor the answer, using all three pieces of evidence (CI, p-value, and effect size).
+
+PUT ANSWERS HERE
+
+2. Write a headline and a 2-3 sentence lede for a story about car thefts in Prince George's County. Unlike the response times story from class (where the effect was small and the headline needed to be cautious), this is a case where the data strongly supports a clear conclusion. Your writing should reflect that — but still note the limitations (correlation vs. causation, what else might explain the decline).
+
+PUT ANSWERS HERE
+
+When you are finished, save your work, switch to GitHub Desktop, then add, commit and push your changes to GitHub and submit the URL of the notebook in ELMS.
