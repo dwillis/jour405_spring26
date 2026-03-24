@@ -40,7 +40,7 @@ head(weekly_wmata)
 
 ### Task 3: Make a line chart
 
-Fill in the REPLACE_ME values to create a line chart of weekly ridership over time.
+Create a line chart of weekly ridership over time.
 
 ```{r}
 weekly_wmata |>
