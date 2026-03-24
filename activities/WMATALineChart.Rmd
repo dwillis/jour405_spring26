@@ -14,6 +14,7 @@ Let's do a quick refresher on line charts using WMATA ridership data, since a li
 
 ```{r}
 library(tidyverse)
+library(lubridate)
 
 wmata <- read_csv("https://raw.githubusercontent.com/dwillis/jour405/refs/heads/main/data/wmata_daily.csv")
 
