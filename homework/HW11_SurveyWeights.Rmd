@@ -27,7 +27,7 @@ Key variables:
 - `Q21`: Voting intention — 1 = Yes, 2 = No, 3 = Unsure
 - `educ`: Education level — College, Some college, High school or less
 
-## Task 1: Examine the Weights
+## Task 1: Examine the Weights (4 points)
 
 Before comparing weighted and unweighted results, let's understand what the weights look like.
 
@@ -48,7 +48,7 @@ ggplot(nonvoters_data, aes(x = weight)) +
 
 ANSWER HERE
 
-## Task 2: Education Distribution in the Sample
+## Task 2: Education Distribution in the Sample (3 points)
 
 ```{r education-distribution}
 nonvoters_data |>
@@ -60,7 +60,7 @@ nonvoters_data |>
 
 ANSWER HERE
 
-## Task 3: Unweighted Voting Intentions by Education
+## Task 3: Unweighted Voting Intentions by Education (4 points)
 
 This is what the results look like if you treat every respondent equally — no weights applied.
 
@@ -89,7 +89,7 @@ unweighted_summary
 
 ANSWER HERE
 
-## Task 4: Weighted Voting Intentions by Education
+## Task 4: Weighted Voting Intentions by Education (2 points)
 
 Now apply the weights. Instead of counting respondents, we sum their weights — so someone with a weight of 2.0 contributes twice as much as someone with a weight of 1.0.
 
@@ -114,7 +114,7 @@ weighted_summary <- weighted_by_education |>
 weighted_summary
 ```
 
-## Task 5: Visualize the Difference
+## Task 5: Visualize the Difference (4 points)
 
 ```{r visualization}
 viz_data <- bind_rows(
@@ -147,7 +147,7 @@ ggplot(viz_data, aes(x = educ, y = percentage, fill = Type)) +
 
 ANSWER HERE
 
-## Task 6: The UMD Belonging Survey
+## Task 6: The UMD Belonging Survey (8 points)
 
 Earlier in class this week, we looked at the 2024 UMD Belonging and Community Survey. That survey had a 23% response rate and the report acknowledged "statistically significant differences" between the sample and the UMD population — but applied no weighting to correct for them.
 
