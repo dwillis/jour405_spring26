@@ -4,83 +4,141 @@ library(tidyverse)
 options(scipen = 999)
 ```
 
-## Identifying Schools with Biggest Differences in Math Test Scores
+## Does Poverty Predict Math Scores? Testing a School Board Member's Claim
 
 ### Introduction
 
-In this analysis, we will create a scatterplot to visualize the relationship between the FARMS (Free and Reduced-price Meal System) percentage and the percentage of students who met or exceeded math expectations. We'll then use linear regression to identify the schools that show the biggest differences between their actual and expected math test scores.
+A school board member in Montgomery County, Pennsylvania has claimed at a public meeting that elementary schools with fewer students on free and reduced-price meals do better on standardized math tests. That's a testable claim, and as data journalists, our job is to test it.
 
-This analysis can be useful for journalists to understand which schools are performing better or worse than expected, based on the socioeconomic status of their student population. By identifying these schools, targeted interventions and support can be provided to help improve student outcomes - and to provide some context on comments by policymakers.
+We have school-level data from Montgomery County, Pa. that includes each school's FARMS percentage (the share of students eligible for Free and Reduced-price Meal System) and the percentage of students who met or exceeded math expectations on state tests. We'll use linear regression to evaluate whether the school board member's claim holds up, and we'll learn something important about what happens when you trust a model before examining your data.
 
 ### Loading the Data
-
-First, let's load the data into a data frame using the read_csv() function from the tidyverse library.
 
 ```{r}
 schools <- read_csv("https://raw.githubusercontent.com/dwillis/jour405_files/refs/heads/main/montgomery_pa.csv")
 ```
-### Task: Create a Scatterplot and Describe the Results (2 points)
 
-Next, let's create a scatterplot to visualize the relationship between the FARMS percentage and the percentage of students who met or exceeded math expectations. We'll use ggplot2 to create the plot and add a linear regression line.
+### Task 1: Examine the Data Before You Plot Anything
+
+Before we visualize anything, let's look at what we're working with.
+
+```{r}
+summary(schools$`FARMS Pct`)
+
+schools |> arrange(desc(`FARMS Pct`)) |> head(10)
+
+schools |> arrange(`FARMS Pct`) |> head(10)
+```
+
+Look at the distribution of FARMS percentages. Do any values look unusual or suspicious? What might it mean if a school has a FARMS percentage of exactly 100? Write two or three sentences describing what you see and whether anything concerns you.
+
+ANSWER HERE
+
+
+### Task 2: Create a Scatterplot and Describe the Results
+
+Now let's visualize the relationship between FARMS percentage and math scores for all schools.
 
 ```{r}
 schools |>
   ggplot(aes(x = `FARMS Pct`, y = `% Met or Exceeded Math Expectations`)) +
   geom_point() +
   geom_smooth(method = "lm", se = FALSE, color = "red") +
-  labs(x = "FARMS Percentage", y = "% Met or Exceeded Math Expectations", title = "Scatterplot of Math Expectations vs FARMS Percentage")
+  labs(x = "FARMS Percentage", y = "% Met or Exceeded Math Expectations",
+       title = "Math Scores vs. FARMS Percentage, Montgomery County PA")
 ```
 
-The scatterplot shows the overall trend of the relationship between the FARMS percentage and the math test scores. The red line represents the linear regression line, which helps us understand the average relationship between the two variables. Based on what you see here, what's the relationship between FARMS percentage and math test scores?
+Describe what you see. Is there a clear trend? Does the regression line look like it represents the data well, or does it seem to be pulled in an odd direction? Connect what you observed in Task 1 to what you see here.
 
 ANSWER HERE
 
 
-### Task: Linear Regression Model (3 points)
+### Task 3: Run the Regression Model
 
-Next, we'll perform a linear regression analysis using the lm() function. We'll set the percentage of students who met or exceeded math expectations as the dependent variable, and the FARMS percentage as the independent variable. In other words, if we know the FARMS percentage for a school, how reliably can we predict its math score?
+Let's build the linear regression model using all schools.
 
 ```{r}
 model <- lm(`% Met or Exceeded Math Expectations` ~ `FARMS Pct`, data = schools)
-
 summary(model)
 ```
 
-There are three things we need to examine here: the p-value, the Adjusted R-squared value and the coefficients. You know what a p-value is and how to evaluate it. The Adjusted R-squared is a measure of how much of the difference between schools' math scores can be explained by their FARMS percentage. You don't need to multiply that figure by anything: that's a percentage. The closer the adjusted R-squared is to 100, the more of the outcome the independent variable explains. If both the p-value and adjusted R-squared values are significant, we can look to the coefficients.
+There are three things to examine: the p-value, the Adjusted R-squared, and the coefficient for FARMS Pct.
 
-In the middle, you can see the (Intercept) is 59.57897 and the FARMS coefficient is 0.12349. Remember high school algebra? Remember learning the equation of a line? Remember swearing that learning y=mx+b is stupid because you’ll never need it again? Surprise. It’s useful again. In this case, we could try to predict a school's score math score by using y=mx+b. In this case, y is the math score, m is 0.12349 and b is 59.57897. So we would multiply a school's FARMS percentage by 0.12349 and then add 59.57897 to it. The result would tell you what the math score would be, according to our model.
+The **p-value** tells you whether the relationship is statistically significant. The **Adjusted R-squared** tells you how much of the variation in math scores is explained by FARMS percentage — it's already a percentage, so a value of 0.025 means 2.5%, not 25%. The **coefficient** on FARMS Pct tells you the direction and size of the relationship: positive means higher FARMS predicts higher math scores; negative means higher FARMS predicts lower scores.
 
-Based on what you've learned so far, is this model worth using? What does it tell us about the nature of the relationship between FARMS percentage and math scores?
+Report all three values and describe what they tell you. Does this model support the school board member's claim? Is this even a model worth using?
 
 ANSWER HERE
 
-### Task: Identifying Schools with Biggest Residuals (2 points)
 
-To find the schools with the biggest differences between their actual and expected math test scores, we'll extract the residuals from the linear regression model. The residuals represent the difference between the actual and predicted values. Residuals can tell you several things, but most important is if a linear model the right model for your data. If the residuals appear to be random, then a linear model is appropriate. If they have a pattern, it means something else is going on in your data and a linear model isn’t appropriate.
+### Task 4: What's Driving the Problem? Filter and Rerun.
 
-Residuals can also tell you who is under-performing and over-performing the model. And the more robust the model – the better your r-squared value is – the more meaningful that label of under or over-performing is. 
-
-We'll then use the arrange() function to sort the data frame by the absolute value of the residuals.
+In Task 1, you likely spotted schools with a FARMS percentage of 100. Those values are suspicious — in most districts, having *every* student on free/reduced lunch is unusual and may indicate a reporting artifact or data error. Let's see what happens when we exclude them.
 
 ```{r}
-schools$predicted <- predict(model)
+schools_filtered <- schools |> filter(`FARMS Pct` < 100)
 
-# Calculate the residuals
-schools <- schools |> 
-  mutate(residual = `% Met or Exceeded Math Expectations` - predicted)
-
-# Sort the data frame by the absolute value of the residuals in descending order
-schools <- schools |>
-  mutate(abs_residual = abs(residual)) |>
-  arrange(desc(abs_residual))
-
+model_filtered <- lm(`% Met or Exceeded Math Expectations` ~ `FARMS Pct`, data = schools_filtered)
+summary(model_filtered)
 ```
-The schools with the biggest positive residuals are performing better than expected, while the schools with the biggest negative residuals are performing worse than expected, based on their FARMS percentage. Look at the absolute values of the residuals; what are the largest differences between the predicted result and the actual math scores?
+
+Now compare the two models side by side:
+
+```{r}
+cat("Full dataset model:\n")
+cat("  Coefficient:", coef(model)[2], "\n")
+cat("  p-value:", summary(model)$coefficients[2,4], "\n")
+cat("  Adjusted R-squared:", summary(model)$adj.r.squared, "\n\n")
+
+cat("Filtered dataset model (FARMS < 100):\n")
+cat("  Coefficient:", coef(model_filtered)[2], "\n")
+cat("  p-value:", summary(model_filtered)$coefficients[2,4], "\n")
+cat("  Adjusted R-squared:", summary(model_filtered)$adj.r.squared, "\n")
+```
+
+How did removing those schools change the model? Did the coefficient change direction? Did the p-value or R-squared improve meaningfully? What does this tell you about the influence of suspicious data values on a regression model?
 
 ANSWER HERE
 
-## Task: Evaluate the model (3 points)
 
-A school board member has said at a meeting that elementary schools with fewer students on free and reduced price meals do better on standardized math tests. Describe what conclusions you'd draw from this model's results and how it would influence a story pitch about the school board member and math scores.
+### Task 5: Even the Better Model Has Problems
+
+Even after filtering, the Adjusted R-squared remains very low. This means FARMS percentage — even when the data is clean — explains very little of the variation in math scores across these schools.
+
+Look at the filtered scatterplot:
+
+```{r}
+schools_filtered |>
+  ggplot(aes(x = `FARMS Pct`, y = `% Met or Exceeded Math Expectations`)) +
+  geom_point() +
+  geom_smooth(method = "lm", se = FALSE, color = "red") +
+  labs(x = "FARMS Percentage", y = "% Met or Exceeded Math Expectations",
+       title = "Math Scores vs. FARMS Percentage (Excluding 100% FARMS Schools)")
+```
+
+With a low R-squared, the residuals from this model aren't very meaningful as labels of "over-performing" or "under-performing" — the model doesn't know enough to make that judgment reliably. But let's calculate them anyway to see the spread:
+
+```{r}
+schools_filtered <- schools_filtered |>
+  mutate(
+    predicted = predict(model_filtered),
+    residual = `% Met or Exceeded Math Expectations` - predicted,
+    abs_residual = abs(residual)
+  ) |>
+  arrange(desc(abs_residual))
+
+head(schools_filtered |> select(1, `FARMS Pct`, `% Met or Exceeded Math Expectations`, predicted, residual), 10)
+```
+
+What are the largest residuals? Given the model's weak R-squared, how much confidence would you have in labeling these schools as over- or under-performers? Why?
+
+ANSWER HERE
+
+
+### Task 6: Write the Story Pitch
+
+You've now run two models, examined the data quality and seen that even a cleaned-up model explains very little of the variation in math scores. Return to the school board member's claim: that schools with fewer students on free and reduced-price meals do better on standardized math tests.
+
+Write a short story pitch (3-5 sentences) that addresses the following: Does the data support or contradict the claim? What data quality issues did you find? What would you need - different data, a different model, additional reporting - before you could responsibly publish a story about this claim? Who would you call first?
 
 ANSWER HERE
